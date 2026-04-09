@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "deploy": "npm run cf:pages:deploy",
     "cf:pages:dev": "npx wrangler pages dev public",
     "cf:pages:deploy": "npx wrangler pages deploy ./public --project-name clippy-pages",
     "cf:realtime:dev": "npx wrangler dev --config cloudflare/realtime/wrangler.toml",
