@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Clippy — Share text between devices in real-time. No login, no apps. Just a code and instant sync.">
+  <meta name="theme-color" content="#0a0e1a">
+  <title>Clippy — Clipboard Sync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+</head>
+<body>
+  <!-- Background animated gradient -->
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <!-- Connection Status Bar -->
+  <div class="status-bar" id="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-text" id="status-text">Connecting...</span>
+  </div>
+
+  <!-- Main Application -->
+  <main class="app-container">
+
+    <!-- ==================== VIEW: HOME ==================== -->
+    <section class="view active" id="view-home">
+      <div class="hero">
+        <div class="logo">
+          <span class="logo-icon">📋</span>
+          <h1>Clippy</h1>
+        </div>
+        <p class="tagline">Copy here → Paste there. <span class="accent">Instantly.</span></p>
+        <p class="subtitle">Share text between devices in real-time. No login, no apps.</p>
+      </div>
+
+      <div class="action-cards">
+        <div class="glass-card card-create" id="btn-create">
+          <div class="card-icon">🚀</div>
+          <h2>Start Session</h2>
+          <p>Generate a code and share it with your other device</p>
+          <div class="card-arrow">→</div>
+        </div>
+
+        <div class="divider-or">
+          <span>or</span>
+        </div>
+
+        <div class="glass-card card-join">
+          <div class="card-icon">🔗</div>
+          <h2>Join Session</h2>
+          <p>Enter the code from your other device</p>
+          <div class="join-input-group">
+            <input
+              type="text"
+              id="input-code"
+              class="code-input"
+              placeholder="ABC-12K"
+              maxlength="7"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button class="btn-join" id="btn-join" disabled>
+              <span>Join</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW: WAITING ==================== -->
+    <section class="view" id="view-waiting">
+      <div class="waiting-content">
+        <div class="pulse-ring">
+          <div class="pulse-dot"></div>
+        </div>
+        <h2>Your Session Code</h2>
+        <div class="code-display" id="display-code">
+          <span class="code-text" id="code-text">---</span>
+          <button class="btn-copy-code" id="btn-copy-code" title="Copy code">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+        </div>
+        <p class="waiting-hint">Enter this code on your other device to connect</p>
+        <div class="ttl-bar">
+          <div class="ttl-progress" id="ttl-progress"></div>
+        </div>
+        <p class="ttl-text" id="ttl-text">Expires in 5:00</p>
+        <button class="btn-cancel" id="btn-cancel-waiting">Cancel</button>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW: CONNECTED ==================== -->
+    <section class="view" id="view-connected">
+      <div class="connected-header">
+        <div class="connected-badge">
+          <div class="connected-dot"></div>
+          <span>Connected</span>
+        </div>
+        <div class="session-info">
+          <span class="session-code" id="connected-code">---</span>
+        </div>
+        <button class="btn-disconnect" id="btn-disconnect" title="Disconnect">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Send Area -->
+      <div class="clip-section send-section">
+        <label class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+          Send Text
+        </label>
+        <div class="send-group">
+          <textarea
+            id="input-clip"
+            class="clip-textarea"
+            placeholder="Paste or type text here..."
+            rows="3"
+          ></textarea>
+          <button class="btn-send" id="btn-send">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+            <span>Send</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Received Clips -->
+      <div class="clip-section receive-section">
+        <label class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Received
+        </label>
+        <div class="clip-feed" id="clip-feed">
+          <div class="empty-state" id="empty-state">
+            <span class="empty-icon">📭</span>
+            <p>No clips received yet</p>
+            <p class="empty-hint">Text sent from the other device will appear here</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="js/ws.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
