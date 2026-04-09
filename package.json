@@ -5,7 +5,11 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "cf:pages:dev": "npx wrangler pages dev public",
+    "cf:pages:deploy": "npx wrangler pages deploy",
+    "cf:realtime:dev": "npx wrangler dev --config cloudflare/realtime/wrangler.toml",
+    "cf:realtime:deploy": "npx wrangler deploy --config cloudflare/realtime/wrangler.toml"
   },
   "keywords": ["clipboard", "sync", "realtime", "websocket"],
   "license": "MIT",

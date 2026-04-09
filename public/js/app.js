@@ -263,6 +263,14 @@
       resetToHome();
     });
 
+    WS.on('device_disconnected', (data) => {
+      UI.showToast('A device disconnected.', 'info', 2500);
+      if (state.view === 'connected') {
+        const devices = typeof data?.devices === 'number' ? data.devices : 1;
+        UI.setStatus('connected', `Synced - ${devices} device${devices > 1 ? 's' : ''}`);
+      }
+    });
+
     // Session expired
     WS.on('session_expired', () => {
       clearSessionStorage();

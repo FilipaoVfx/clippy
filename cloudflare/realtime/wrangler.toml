@@ -1,0 +1,19 @@
+name = "clippy-realtime"
+main = "src/index.js"
+compatibility_date = "2026-04-09"
+
+[vars]
+SESSION_TTL_MS = "300000"
+DEVICE_DISCONNECT_TTL_MS = "60000"
+MAX_MESSAGE_SIZE = "10240"
+RATE_LIMIT_MAX = "30"
+RATE_LIMIT_WINDOW_MS = "60000"
+MAX_DEVICES = "5"
+
+[[durable_objects.bindings]]
+name = "CLIPPY_COORDINATOR"
+class_name = "ClippyCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ClippyCoordinator"]

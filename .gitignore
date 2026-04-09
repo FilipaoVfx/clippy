@@ -1,2 +1,6 @@
 node_modules/
 .env
+.env.*
+.wrangler/
+.agents/
+skills-lock.json
