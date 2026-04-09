@@ -71,14 +71,21 @@ Si ves `Authentication error [code: 10000]` durante `wrangler pages deploy`, nor
 
 ## GitHub Actions
 
-Se agrego el workflow [`deploy-pages.yml`](../.github/workflows/deploy-pages.yml) para desplegar Pages en `push` a `main` y manualmente con `workflow_dispatch`.
+Se agrego el workflow [`deploy-pages.yml`](../.github/workflows/deploy-pages.yml) para desplegar **ambos** componentes en `push` a `main` y manualmente con `workflow_dispatch`.
+
+Orden del workflow:
+
+1. Verifica autenticacion.
+2. Crea el proyecto Pages si no existe.
+3. Despliega `clippy-realtime`.
+4. Despliega Pages.
 
 Configura este secret en GitHub:
 
 1. Ve a `Repository Settings -> Secrets and variables -> Actions`.
 2. Crea `CLOUDFLARE_API_TOKEN`.
 3. Crea `CLOUDFLARE_ACCOUNT_ID` (tu account id de Cloudflare).
-4. Pega el token con permisos de Pages (`Pages Write`) en `CLOUDFLARE_API_TOKEN`.
+4. Pega el token con permisos de Pages y Workers en `CLOUDFLARE_API_TOKEN`.
 5. (Opcional) En `Variables`, crea `CF_PAGES_PROJECT` con el nombre exacto del proyecto Pages.
 
 El workflow usa:

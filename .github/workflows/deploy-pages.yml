@@ -1,4 +1,4 @@
-name: Deploy Pages
+name: Deploy Cloudflare
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-pages:
+  deploy-cloudflare:
     runs-on: ubuntu-latest
     env:
       CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
@@ -42,6 +42,12 @@ jobs:
             echo "Pages project not found, creating: $PROJECT_NAME"
             npx wrangler pages project create "$PROJECT_NAME" --production-branch main
           fi
+
+      - name: Deploy realtime Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run cf:realtime:deploy
 
       - name: Deploy to Cloudflare Pages
         env:
