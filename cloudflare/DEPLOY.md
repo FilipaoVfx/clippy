@@ -27,7 +27,26 @@ npm run cf:realtime:deploy
 npm run cf:pages:deploy
 ```
 
-3. Si usas Git integration, deja `wrangler.toml` en la raiz como source of truth del proyecto Pages.
+El script `cf:pages:deploy` ejecuta:
+
+```bash
+npx wrangler pages deploy ./public --project-name clippy-pages
+```
+
+3. Si quieres un solo comando para ambos despliegues:
+
+```bash
+npm run cf:deploy
+```
+
+## CI / Cloudflare Build
+
+Para este repo, **no uses** `npx wrangler deploy` para Pages.
+
+- Correcto para Pages: `npm run cf:pages:deploy`
+- Correcto para Worker realtime: `npm run cf:realtime:deploy`
+
+Si usas Git integration de Pages (sin direct upload), no necesitas `wrangler pages deploy`; define build/output en el dashboard y deja `wrangler.toml` como source of truth de bindings.
 
 ## Desarrollo local
 
