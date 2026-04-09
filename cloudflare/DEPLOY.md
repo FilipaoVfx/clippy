@@ -77,13 +77,15 @@ Configura este secret en GitHub:
 
 1. Ve a `Repository Settings -> Secrets and variables -> Actions`.
 2. Crea `CLOUDFLARE_API_TOKEN`.
-3. Pega el token con permisos de Pages (`Pages Write`).
+3. Crea `CLOUDFLARE_ACCOUNT_ID` (tu account id de Cloudflare).
+4. Pega el token con permisos de Pages (`Pages Write`) en `CLOUDFLARE_API_TOKEN`.
 
 El workflow usa:
 
 ```yaml
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 Si usas Git integration de Pages (sin direct upload), no necesitas `wrangler pages deploy`; define build/output en el dashboard y deja `wrangler.toml` como source of truth de bindings.
