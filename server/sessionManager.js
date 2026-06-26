@@ -328,6 +328,12 @@ function getStats() {
   };
 }
 
+function _reset() {
+  sessions.clear();
+  socketToSession.clear();
+  deviceToSession.clear();
+}
+
 module.exports = {
   createSession,
   joinSession,
@@ -345,4 +351,5 @@ module.exports = {
   cleanExpiredSessions,
   getStats,
   MAX_DEVICES,
+  _reset,
 };
