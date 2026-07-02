@@ -868,6 +868,114 @@ body {
   to { opacity: 0; transform: translateX(40px); }
 }
 
+/* ---- Image Send Section (RF-13) ---- */
+.send-image-section {
+  margin-top: 8px;
+}
+
+.image-drop-zone {
+  border: 2px dashed var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  padding: 24px 16px 12px;
+  text-align: center;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  cursor: default;
+}
+
+.image-drop-zone.drag-over {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.drop-zone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.drop-zone-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.drop-zone-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.btn-send-image {
+  margin-top: 4px;
+  padding: 7px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.btn-send-image:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-glow);
+}
+
+.image-limits {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ---- Received Image Items ---- */
+.image-item {
+  padding: 10px;
+}
+
+.image-wrapper {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  max-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px;
+}
+
+.received-image {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.btn-download-img {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-download-img:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 480px) {
   .app-container {

@@ -4,10 +4,13 @@ const DEFAULTS = {
   sessionTtlMs: 300000,
   deviceDisconnectTtlMs: 60000,
   maxMessageSize: 10240,
+  imageMaxBytes: 5 * 1024 * 1024,
   rateLimitMax: 30,
   rateLimitWindowMs: 60000,
   maxDevices: 5,
 };
+
+const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const CODE_DIGITS = "0123456789";
@@ -60,6 +63,32 @@ function generateCode(existingCodes) {
 
 function validateCode(code) {
   return /^[A-Z]{3}-[0-9]{2}[A-Z]$/.test(code);
+}
+
+function validateImage(dataUri, maxBytes) {
+  if (typeof dataUri !== "string") {
+    return { valid: false, error: "Image data must be a string" };
+  }
+
+  const match = dataUri.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+=*)$/);
+  if (!match) {
+    return { valid: false, error: "Invalid image format. Use PNG, JPG, or WEBP as a data URI." };
+  }
+
+  const mimeType = match[1];
+  if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+    return { valid: false, error: "Unsupported format. Use PNG, JPG, or WEBP." };
+  }
+
+  const base64Data = match[2];
+  const paddingChars = base64Data.endsWith("==") ? 2 : base64Data.endsWith("=") ? 1 : 0;
+  const byteSize = (base64Data.length * 3) / 4 - paddingChars;
+
+  if (byteSize > maxBytes) {
+    return { valid: false, error: `Image exceeds ${Math.floor(maxBytes / (1024 * 1024))} MB limit` };
+  }
+
+  return { valid: true, mimeType };
 }
 
 function sanitizeText(text) {
@@ -119,6 +148,7 @@ export class ClippyCoordinator extends DurableObject {
       sessionTtlMs: readNumber(env, "SESSION_TTL_MS", DEFAULTS.sessionTtlMs),
       deviceDisconnectTtlMs: readNumber(env, "DEVICE_DISCONNECT_TTL_MS", DEFAULTS.deviceDisconnectTtlMs),
       maxMessageSize: readNumber(env, "MAX_MESSAGE_SIZE", DEFAULTS.maxMessageSize),
+      imageMaxBytes: readNumber(env, "IMAGE_MAX_BYTES", DEFAULTS.imageMaxBytes),
       rateLimitMax: readNumber(env, "RATE_LIMIT_MAX", DEFAULTS.rateLimitMax),
       rateLimitWindowMs: readNumber(env, "RATE_LIMIT_WINDOW_MS", DEFAULTS.rateLimitWindowMs),
       maxDevices: readNumber(env, "MAX_DEVICES", DEFAULTS.maxDevices),
@@ -246,6 +276,9 @@ export class ClippyCoordinator extends DurableObject {
         break;
       case "send_clip":
         await this.handleSendClip(socketId, data);
+        break;
+      case "send_image":
+        await this.handleSendImage(socketId, data);
         break;
       case "leave_session":
         await this.handleLeaveSession(socketId);
@@ -472,6 +505,39 @@ export class ClippyCoordinator extends DurableObject {
       type: "clip_sent",
       timestamp: payload.timestamp,
     });
+  }
+
+  async handleSendImage(socketId, data) {
+    const validation = validateImage(data.data, this.config.imageMaxBytes);
+    if (!validation.valid) {
+      this.sendById(socketId, { type: "error", message: validation.error });
+      return;
+    }
+
+    const code = this.runtime.socketToSession.get(socketId);
+    if (!code) {
+      this.sendById(socketId, { type: "error", message: "Not in a session" });
+      return;
+    }
+
+    const peers = this.getPeerSocketIds(code, socketId);
+    if (peers.length === 0) {
+      this.sendById(socketId, { type: "error", message: "No connected peers" });
+      return;
+    }
+
+    const timestamp = Date.now();
+
+    for (const peerSocketId of peers) {
+      this.sendById(peerSocketId, {
+        type: "receive_image",
+        data: data.data,
+        mimeType: validation.mimeType,
+        timestamp,
+      });
+    }
+
+    this.sendById(socketId, { type: "image_sent", timestamp });
   }
 
   async handleLeaveSession(socketId) {

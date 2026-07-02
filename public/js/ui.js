@@ -157,6 +157,64 @@ const UI = (() => {
   }
 
   /**
+   * Add a received image to the feed (RF-13).
+   */
+  function addImageToFeed(dataUri, mimeType, timestamp) {
+    if (els.emptyState) {
+      els.emptyState.style.display = 'none';
+    }
+
+    const time = new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const item = document.createElement('div');
+    item.className = 'clip-item image-item new';
+
+    const img = document.createElement('img');
+    img.src = dataUri;
+    img.alt = 'Received image';
+    img.className = 'received-image';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-wrapper';
+    wrapper.appendChild(img);
+
+    const meta = document.createElement('div');
+    meta.className = 'clip-meta';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'clip-time';
+    timeSpan.textContent = time;
+
+    const dlBtn = document.createElement('a');
+    dlBtn.className = 'btn-download-img';
+    dlBtn.href = dataUri;
+    dlBtn.download = `clippy-image-${timestamp}.${mimeType.split('/')[1]}`;
+    dlBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+      Download
+    `;
+
+    meta.appendChild(timeSpan);
+    meta.appendChild(dlBtn);
+    item.appendChild(wrapper);
+    item.appendChild(meta);
+
+    els.clipFeed.insertBefore(item, els.clipFeed.firstChild);
+
+    setTimeout(() => item.classList.remove('new'), 2000);
+
+    while (els.clipFeed.children.length > 21) {
+      els.clipFeed.removeChild(els.clipFeed.lastChild);
+    }
+  }
+
+  /**
    * Clear the clip feed.
    */
   function clearFeed() {
@@ -277,6 +335,7 @@ const UI = (() => {
     setConnectedCode,
     updateTTL,
     addClipToFeed,
+    addImageToFeed,
     clearFeed,
     copyToClipboard,
     showToast,
