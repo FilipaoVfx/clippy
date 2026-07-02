@@ -36,7 +36,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           PROJECT_NAME="${CF_PAGES_PROJECT:-clippy-pages}"
-          if npx wrangler pages project list --json | jq -e --arg NAME "$PROJECT_NAME" '.[] | select(.name == $NAME)' > /dev/null; then
+          if npx wrangler pages project list 2>&1 | grep -qF "$PROJECT_NAME"; then
             echo "Using existing Pages project: $PROJECT_NAME"
           else
             echo "Pages project not found, creating: $PROJECT_NAME"
