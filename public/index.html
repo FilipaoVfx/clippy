@@ -116,7 +116,7 @@
         </button>
       </div>
 
-      <!-- Send Area -->
+      <!-- Send Text -->
       <div class="clip-section send-section">
         <label class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -140,7 +140,28 @@
         </div>
       </div>
 
-      <!-- Received Clips -->
+      <!-- Send Image (RF-13) -->
+      <div class="clip-section send-image-section">
+        <label class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+          Send Image
+        </label>
+        <div class="image-drop-zone" id="image-drop-zone">
+          <input type="file" id="input-image" accept="image/png,image/jpeg,image/webp" class="hidden-file-input" aria-label="Select image">
+          <div class="drop-zone-inner">
+            <span class="drop-zone-icon">🖼️</span>
+            <p class="drop-zone-text">Drop image here or paste from clipboard</p>
+            <button class="btn-send-image" id="btn-send-image" type="button">Browse file</button>
+          </div>
+          <p class="image-limits">PNG · JPG · WEBP &nbsp;·&nbsp; max 5 MB</p>
+        </div>
+      </div>
+
+      <!-- Received -->
       <div class="clip-section receive-section">
         <label class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -151,8 +172,8 @@
         <div class="clip-feed" id="clip-feed">
           <div class="empty-state" id="empty-state">
             <span class="empty-icon">📭</span>
-            <p>No clips received yet</p>
-            <p class="empty-hint">Text sent from the other device will appear here</p>
+            <p>No content received yet</p>
+            <p class="empty-hint">Text and images from the other device appear here</p>
           </div>
         </div>
       </div>

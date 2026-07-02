@@ -572,3 +572,155 @@ describe('ClippyCoordinator — invalid messages', () => {
     expect(err?.message).toMatch(/invalid code/i);
   });
 });
+
+// ─── Image relay (RF-13/RF-14) ───────────────────────────────────────────────
+
+// Minimal valid 1×1 PNG as data URI (base64)
+const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const TINY_JPEG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVIP/2Q==';
+
+describe('ClippyCoordinator — image relay (RF-13/RF-14)', () => {
+  it('relays a valid PNG image to peers and confirms to sender', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    s1.messages = []; // clear
+    await sendMsg(coord, s2, { type: 'send_image', data: TINY_PNG });
+
+    const confirmation = s2.find('image_sent');
+    expect(confirmation).toBeDefined();
+    expect(confirmation.timestamp).toBeGreaterThan(0);
+
+    const received = s1.find('receive_image');
+    expect(received).toBeDefined();
+    expect(received.data).toBe(TINY_PNG);
+    expect(received.mimeType).toBe('image/png');
+    expect(received.timestamp).toBeGreaterThan(0);
+  });
+
+  it('relays a valid JPEG image', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    await sendMsg(coord, s2, { type: 'send_image', data: TINY_JPEG });
+
+    const received = s1.find('receive_image');
+    expect(received).toBeDefined();
+    expect(received.mimeType).toBe('image/jpeg');
+  });
+
+  it('does not store image data in Durable Object storage', async () => {
+    const { coord, storage } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    const putsBefore = storage.put.mock.calls.length;
+    await sendMsg(coord, s2, { type: 'send_image', data: TINY_PNG });
+    const putsAfter = storage.put.mock.calls.length;
+
+    // No additional state.put calls — image must NOT be written to storage
+    expect(putsAfter).toBe(putsBefore);
+  });
+
+  it('rejects send_image when not in a session', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord);
+
+    await sendMsg(coord, s1, { type: 'send_image', data: TINY_PNG });
+
+    expect(s1.find('error')?.message).toMatch(/not in a session/i);
+  });
+
+  it('rejects send_image with no connected peers', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord);
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    await sendMsg(coord, s1, { type: 'send_image', data: TINY_PNG });
+
+    expect(s1.find('error')?.message).toMatch(/no connected peers/i);
+  });
+
+  it('rejects send_image with invalid data URI', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    await sendMsg(coord, s2, { type: 'send_image', data: 'not-a-data-uri' });
+
+    expect(s2.find('error')?.message).toMatch(/invalid image format/i);
+  });
+
+  it('rejects send_image with unsupported mime type (SVG)', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    await sendMsg(coord, s2, {
+      type: 'send_image',
+      data: 'data:image/svg+xml;base64,PHN2Zyc+PC9zdmc+',
+    });
+
+    expect(s2.find('error')?.message).toMatch(/invalid image format/i);
+  });
+
+  it('rejects send_image exceeding size limit', async () => {
+    const { coord } = await newCoordinator(undefined, { IMAGE_MAX_BYTES: '100' });
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    // Build a data URI > 100 bytes decoded
+    const bigData = 'data:image/png;base64,' + 'A'.repeat(200);
+    await sendMsg(coord, s2, { type: 'send_image', data: bigData });
+
+    expect(s2.find('error')?.message).toMatch(/exceeds/i);
+  });
+
+  it('sends image to all connected peers in a multi-device session', async () => {
+    const { coord } = await newCoordinator(undefined, { MAX_DEVICES: '3' });
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+    const { code } = s1.find('session_created');
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code });
+
+    const { server: s3 } = await openSocket(coord, '3.3.3.3');
+    await sendMsg(coord, s3, { type: 'join_session', code });
+
+    s1.messages = [];
+    s2.messages = [];
+    await sendMsg(coord, s3, { type: 'send_image', data: TINY_PNG });
+
+    expect(s1.find('receive_image')).toBeDefined();
+    expect(s2.find('receive_image')).toBeDefined();
+    expect(s3.find('image_sent')).toBeDefined();
+    expect(s3.find('receive_image')).toBeUndefined(); // sender doesn't receive own image
+  });
+});

@@ -56,6 +56,32 @@
     setupWSListeners();
   }
 
+  // ── Image transfer helpers (RF-13) ──────────────────────
+  const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+  function sendImageFile(file) {
+    if (!file || !ALLOWED_IMAGE_TYPES.has(file.type)) {
+      UI.showToast('Unsupported format. Use PNG, JPG, or WEBP.', 'error');
+      return;
+    }
+    if (file.size > IMAGE_MAX_BYTES) {
+      UI.showToast('Image exceeds 5 MB limit.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUri = e.target.result;
+      const sent = WS.send({ type: 'send_image', data: dataUri });
+      if (!sent) {
+        UI.showToast('Not connected. Cannot send image.', 'error');
+      }
+    };
+    reader.onerror = () => UI.showToast('Failed to read image file.', 'error');
+    reader.readAsDataURL(file);
+  }
+
   /**
    * Bind UI event handlers.
    */
@@ -126,6 +152,45 @@
     // Disconnect
     els.btnDisconnect.addEventListener('click', () => {
       cancelSession();
+    });
+
+    // Image — browse button triggers hidden file input
+    const inputImage = document.getElementById('input-image');
+    const btnSendImage = document.getElementById('btn-send-image');
+    const dropZone = document.getElementById('image-drop-zone');
+
+    btnSendImage.addEventListener('click', () => inputImage.click());
+
+    inputImage.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) sendImageFile(file);
+      inputImage.value = '';
+    });
+
+    // Drag-and-drop on the drop zone
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) sendImageFile(file);
+    });
+
+    // Global paste — grab image from clipboard when connected
+    document.addEventListener('paste', (e) => {
+      if (state.view !== 'connected') return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) { sendImageFile(file); break; }
+        }
+      }
     });
   }
 
@@ -254,6 +319,17 @@
     WS.on('clip_sent', () => {
       UI.clearClipInput();
       UI.showToast('Sent!', 'success', 1500);
+    });
+
+    // Image received (RF-13)
+    WS.on('receive_image', (data) => {
+      UI.addImageToFeed(data.data, data.mimeType, data.timestamp);
+      UI.showToast('Image received!', 'info', 2000);
+    });
+
+    // Image sent confirmation
+    WS.on('image_sent', () => {
+      UI.showToast('Image sent!', 'success', 1500);
     });
 
     // Peer disconnected

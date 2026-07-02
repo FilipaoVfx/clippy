@@ -3,6 +3,7 @@ const {
   checkRateLimit,
   sanitizeText,
   validateMessage,
+  validateImage,
   validateCode,
 } = require('./security');
 const sessionManager = require('./sessionManager');
@@ -63,6 +64,9 @@ function handleMessage(ws, socketId, data) {
       break;
     case 'send_clip':
       handleSendClip(ws, socketId, data);
+      break;
+    case 'send_image':
+      handleSendImage(ws, socketId, data);
       break;
     case 'leave_session':
       handleLeaveSession(ws, socketId);
@@ -222,6 +226,43 @@ function handleSendClip(ws, socketId, data) {
     type: 'clip_sent',
     timestamp,
   });
+}
+
+/**
+ * Handle ephemeral image relay (RF-13/RF-14).
+ * Images are validated then forwarded directly to peers — never stored.
+ */
+function handleSendImage(ws, socketId, data) {
+  const validation = validateImage(data.data);
+  if (!validation.valid) {
+    send(ws, { type: 'error', message: validation.error });
+    return;
+  }
+
+  const session = sessionManager.getSessionBySocket(socketId);
+  if (!session) {
+    send(ws, { type: 'error', message: 'Not in a session' });
+    return;
+  }
+
+  const peerSockets = sessionManager.getPeerSockets(socketId);
+  if (peerSockets.length === 0) {
+    send(ws, { type: 'error', message: 'No connected peers' });
+    return;
+  }
+
+  const timestamp = Date.now();
+
+  for (const peerWs of peerSockets) {
+    send(peerWs, {
+      type: 'receive_image',
+      data: data.data,
+      mimeType: validation.mimeType,
+      timestamp,
+    });
+  }
+
+  send(ws, { type: 'image_sent', timestamp });
 }
 
 /**
