@@ -8,16 +8,44 @@ function getCoordinator(env) {
   return env.CLIPPY_COORDINATOR.get(id);
 }
 
+// Files that must always be revalidated so a new deploy is picked up
+// immediately (no stale PWA / no forced reinstall). Everything else may be
+// briefly cached but still revalidates cheaply.
+function cacheControlFor(pathname) {
+  if (
+    pathname === "/" ||
+    pathname === SPA_ENTRY ||
+    pathname.endsWith(".html") ||
+    pathname === "/sw.js" ||
+    pathname === "/manifest.webmanifest"
+  ) {
+    return "no-cache";
+  }
+  // Static assets: cache but revalidate (unhashed filenames → keep them fresh).
+  return "public, max-age=0, must-revalidate";
+}
+
+function withHeaders(response, pathname) {
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", cacheControlFor(pathname));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function serveAsset(request, env) {
+  const url = new URL(request.url);
   const assetResponse = await env.ASSETS.fetch(request);
   if (assetResponse.status !== 404) {
-    return assetResponse;
+    return withHeaders(assetResponse, url.pathname);
   }
 
   const acceptsHtml = (request.headers.get("accept") || "").includes("text/html");
   if (request.method === "GET" && acceptsHtml) {
-    const url = new URL(request.url);
-    return env.ASSETS.fetch(new Request(new URL(SPA_ENTRY, url), request));
+    const fallback = await env.ASSETS.fetch(new Request(new URL(SPA_ENTRY, url), request));
+    return withHeaders(fallback, SPA_ENTRY);
   }
 
   return assetResponse;
