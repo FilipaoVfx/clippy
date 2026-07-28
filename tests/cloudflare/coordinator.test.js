@@ -24,9 +24,23 @@ function createMockStorage(initial = undefined) {
 }
 
 function createMockCtx(storage) {
+  // Mirrors the hibernation API: the runtime owns the sockets and hands them
+  // back via getWebSockets(), optionally filtered by the tags passed to accept.
+  const accepted = [];
+
   return {
     storage,
     blockConcurrencyWhile: async (fn) => await fn(),
+    acceptWebSocket: (ws, tags = []) => {
+      ws._tags = tags;
+      accepted.push(ws);
+    },
+    getWebSockets: (tag) => {
+      const live = accepted.filter((ws) => !ws.closed);
+      if (tag === undefined) return live;
+      return live.filter((ws) => (ws._tags || []).includes(tag));
+    },
+    setWebSocketAutoResponse: () => {},
   };
 }
 
@@ -54,6 +68,10 @@ class MockWebSocket {
   close(code, reason) { this.closed = true; this.closeCode = code; this.closeReason = reason; }
   accept() {}
   addEventListener(event, fn) { this._listeners[event] = fn; }
+  // Attachments are structured-cloned by the real runtime; round-trip through
+  // JSON so tests catch code that relies on holding a live reference.
+  serializeAttachment(value) { this._attachment = JSON.stringify(value); }
+  deserializeAttachment() { return this._attachment ? JSON.parse(this._attachment) : null; }
   last() { return this.messages[this.messages.length - 1]; }
   find(type) { return this.messages.find(m => m.type === type); }
 }
@@ -112,16 +130,17 @@ async function openSocket(coord, ip = '1.2.3.4') {
   return { server, socketId };
 }
 
-async function flushAsync() {
-  await new Promise(resolve => setTimeout(resolve, 0));
+// The hibernation handlers are plain async methods, so they can be awaited
+// directly — no macrotask flushing needed as with the old event listeners.
+async function sendMsg(coord, server, msg) {
+  await coord.webSocketMessage(server, JSON.stringify(msg));
+  return server.last();
 }
 
-async function sendMsg(coord, server, msg) {
-  // The DO message listener does not return the inner async Promise, so we must
-  // flush the macrotask queue (setTimeout 0) to let all awaited microtasks settle.
-  server._listeners.message({ data: JSON.stringify(msg) });
-  await new Promise(resolve => setTimeout(resolve, 0));
-  return server.last();
+/** Simulate the peer dropping the connection. */
+async function closeSocket(coord, server) {
+  server.closed = true;
+  await coord.webSocketClose(server);
 }
 
 beforeEach(() => {
@@ -244,8 +263,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s1, { type: 'create_session' });
     const { code } = s1.find('session_created');
 
-    s1._listeners.close({ code: 1001, reason: 'gone' });
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     const session = coord.stateData.sessionsByCode[code];
     const device = session.devices.find(d => d.socketId === socketId);
@@ -258,8 +276,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s1, { type: 'create_session' });
     const { code } = s1.find('session_created');
 
-    s1._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     expect(coord.stateData.sessionsByCode[code]).toBeDefined();
   });
@@ -291,8 +308,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s2, { type: 'join_session', code });
 
     s1.messages = [];
-    s2._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s2);
 
     const notice = s1.find('device_disconnected');
     expect(notice).toBeDefined();
@@ -310,8 +326,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s2, { type: 'join_session', code });
     const { sessionId: sid2, deviceId: did2, resumeToken: rt2 } = s2.find('session_joined');
 
-    s2._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s2);
     s1.messages = [];
 
     const { server: s3 } = await openSocket(coord, '2.2.2.2');
@@ -377,8 +392,7 @@ describe('ClippyCoordinator — alarm scheduling for maximum persistence', () =>
     const { server: s1 } = await openSocket(coord);
     await sendMsg(coord, s1, { type: 'create_session' });
 
-    s1._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     // Alarm should fire before full session TTL (300s) because disconnect TTL is 60s
     const alarmTime = storage.getAlarmTime();
@@ -453,6 +467,52 @@ describe('ClippyCoordinator — rate limiting', () => {
 
     const errors = s1.messages.filter(m => m.type === 'error' && /rate limit/i.test(m.message));
     expect(errors).toHaveLength(0);
+  });
+
+  it('blocks payloads exceeding the byte budget even when message count is fine', async () => {
+    // Generous message allowance, tiny byte allowance: the byte lane must be
+    // what rejects the payload.
+    const { coord } = await newCoordinator(undefined, {
+      RATE_LIMIT_MAX: '100',
+      RATE_LIMIT_BYTES: '200',
+      MAX_MESSAGE_SIZE: '10240',
+    });
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    await sendMsg(coord, s1, { type: 'send_clip', content: 'x'.repeat(2000) });
+
+    const errors = s1.messages.filter(m => m.type === 'error' && /rate limit/i.test(m.message));
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('refills the byte budget over time', async () => {
+    const { coord } = await newCoordinator(undefined, {
+      RATE_LIMIT_BYTES: '1000',
+      RATE_LIMIT_WINDOW_MS: '1000',
+    });
+
+    // Drain the byte lane, then advance the clock past a full window.
+    expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(true);
+    expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(false);
+
+    const realNow = Date.now;
+    Date.now = () => realNow() + 2000;
+    try {
+      expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(true);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  it('does not spend message tokens for zero-cost lanes (chunked transfers)', async () => {
+    const { coord } = await newCoordinator(undefined, { RATE_LIMIT_MAX: '2' });
+
+    // A chunked transfer sends many frames; charging each one a message token
+    // would abort the transfer after RATE_LIMIT_MAX frames.
+    for (let i = 0; i < 50; i++) {
+      expect(coord.checkRateLimit('8.8.8.8', { msgCost: 0, byteCost: 1024 })).toBe(true);
+    }
   });
 });
 
@@ -547,7 +607,7 @@ describe('ClippyCoordinator — invalid messages', () => {
     const { coord } = await newCoordinator();
     const { server: s1 } = await openSocket(coord);
 
-    await s1._listeners.message({ data: 'not json{{{' });
+    await coord.webSocketMessage(s1, 'not json{{{');
 
     expect(s1.find('error')).toBeDefined();
   });

@@ -13,6 +13,27 @@ const WS = (() => {
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   const BASE_DELAY = 1000;
+  // Mobile networks and proxies drop idle WebSockets, which is a common cause of
+  // spurious reconnects. The server answers these via setWebSocketAutoResponse,
+  // so they never wake the Durable Object and cost nothing.
+  const KEEPALIVE_MS = 30000;
+  let keepaliveTimer = null;
+
+  function startKeepalive() {
+    stopKeepalive();
+    keepaliveTimer = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        try { socket.send('ping'); } catch (err) { /* next tick will retry */ }
+      }
+    }, KEEPALIVE_MS);
+  }
+
+  function stopKeepalive() {
+    if (keepaliveTimer) {
+      clearInterval(keepaliveTimer);
+      keepaliveTimer = null;
+    }
+  }
 
   /**
    * Connect to the WebSocket server.
@@ -39,6 +60,7 @@ const WS = (() => {
     socket.onopen = () => {
       console.log('[WS] Connected');
       reconnectAttempts = 0;
+      startKeepalive();
       emit('ws_open');
 
       if (resumeCredentials && !isReconnecting) {
@@ -47,6 +69,9 @@ const WS = (() => {
     };
 
     socket.onmessage = (event) => {
+      // Keepalive reply from setWebSocketAutoResponse — plain text, not JSON.
+      if (event.data === 'pong') return;
+
       try {
         const data = JSON.parse(event.data);
         emit(data.type, data);
@@ -57,6 +82,7 @@ const WS = (() => {
 
     socket.onclose = (event) => {
       console.log(`[WS] Closed: ${event.code} ${event.reason}`);
+      stopKeepalive();
       emit('ws_close', { code: event.code, reason: event.reason });
 
       if (!intentionalClose) {
@@ -127,6 +153,7 @@ const WS = (() => {
   function disconnect() {
     intentionalClose = true;
     clearTimeout(reconnectTimer);
+    stopKeepalive();
     if (socket) {
       socket.close(1000, 'User disconnect');
       socket = null;
