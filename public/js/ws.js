@@ -10,6 +10,7 @@ const WS = (() => {
   let intentionalClose = false;
   let resumeCredentials = null;
   let isReconnecting = false;
+  let currentCode = null;
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   const BASE_DELAY = 1000;
@@ -36,17 +37,27 @@ const WS = (() => {
   }
 
   /**
-   * Connect to the WebSocket server.
+   * Connect to the WebSocket server for a given session code.
+   *
+   * Sessions are sharded server-side by code, so the code has to be known
+   * before connecting. Callers pass it once; reconnects reuse it.
    */
-  function connect() {
+  function connect(code) {
+    if (code) currentCode = code;
+
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    if (!currentCode) {
+      console.warn('[WS] No session code, not connecting');
       return;
     }
 
     intentionalClose = false;
     isReconnecting = false;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/ws`;
+    const url = `${protocol}//${window.location.host}/ws?code=${encodeURIComponent(currentCode)}`;
 
     try {
       socket = new WebSocket(url);
@@ -154,10 +165,15 @@ const WS = (() => {
     intentionalClose = true;
     clearTimeout(reconnectTimer);
     stopKeepalive();
+    currentCode = null;
     if (socket) {
       socket.close(1000, 'User disconnect');
       socket = null;
     }
+  }
+
+  function getCode() {
+    return currentCode;
   }
 
   /**
@@ -259,6 +275,7 @@ const WS = (() => {
     connect,
     send,
     disconnect,
+    getCode,
     on,
     off,
     isConnected,

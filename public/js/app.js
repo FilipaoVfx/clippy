@@ -11,7 +11,30 @@
     ttlInterval: null,
     sessionCreatedAt: null,
     sessionTTL: 300000,  // 5 minutes
+    pendingIntent: null, // what to do once the socket is up
+    createRetries: 0,    // guards against a code-collision loop
   };
+
+  // ── Session codes (RF-02) ────────────────────────────────
+  // Sessions are sharded server-side by code, so the code has to exist before
+  // connecting. The client picks it and the server rejects collisions, which
+  // keeps pairing to a single connection with no reconnect round-trip.
+  const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O, they read as 1/0
+  const CODE_DIGITS = '0123456789';
+  const MAX_CODE_RETRIES = 5;
+
+  function pick(alphabet) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return alphabet[values[0] % alphabet.length];
+  }
+
+  function generateCode() {
+    return (
+      pick(CODE_LETTERS) + pick(CODE_LETTERS) + pick(CODE_LETTERS) + '-' +
+      pick(CODE_DIGITS) + pick(CODE_DIGITS) + pick(CODE_LETTERS)
+    );
+  }
 
   // ── localStorage helpers (RF-09) ─────────────────────────
   const STORAGE_KEY = 'clippy_session';
@@ -52,8 +75,49 @@
     UI.init();
     bindEvents();
     WS.setupAutoReconnect();
-    WS.connect();
     setupWSListeners();
+    restoreOrIdle();
+  }
+
+  /**
+   * Connect only when there is a session to connect to.
+   *
+   * Sessions are sharded by code, so there is nothing to connect to before one
+   * exists — and not opening a socket on every page load avoids spinning up a
+   * Durable Object for visitors who never pair.
+   */
+  function restoreOrIdle() {
+    const stored = loadSessionFromStorage();
+    if (stored && stored.code) {
+      WS.setResumeCredentials({
+        sessionId: stored.session_id,
+        deviceId: stored.device_id,
+        resumeToken: stored.resume_token,
+      });
+      UI.setStatus('idle', 'Reconnecting...');
+      WS.connect(stored.code); // resume is sent automatically once open
+      return;
+    }
+    UI.setStatus('idle', 'Ready to pair');
+  }
+
+  /** Start a brand new session under a locally generated code. */
+  function startCreateSession() {
+    const code = generateCode();
+    WS.clearResumeCredentials(); // a stale token would trigger a resume instead
+    state.pendingIntent = { type: 'create' };
+    UI.setStatus('idle', 'Creating session...');
+    WS.disconnect();
+    WS.connect(code);
+  }
+
+  /** Join an existing session by its code. */
+  function startJoinSession(code) {
+    WS.clearResumeCredentials();
+    state.pendingIntent = { type: 'join', code };
+    UI.setStatus('idle', 'Joining...');
+    WS.disconnect();
+    WS.connect(code);
   }
 
   // ── Image transfer helpers (RF-13) ──────────────────────
@@ -90,7 +154,8 @@
 
     // Create Session
     els.btnCreate.addEventListener('click', () => {
-      WS.send({ type: 'create_session' });
+      state.createRetries = 0;
+      startCreateSession();
     });
 
     // Join Session — code input
@@ -114,7 +179,7 @@
     els.btnJoin.addEventListener('click', () => {
       const code = UI.getCodeInput();
       if (code) {
-        WS.send({ type: 'join_session', code });
+        startJoinSession(code);
       }
     });
 
@@ -220,23 +285,35 @@
       UI.setStatus('disconnected', 'Connection error');
     });
 
-    // Server welcome
+    // Server welcome — act on whatever we connected in order to do
     WS.on('connected', (data) => {
       state.socketId = data.socketId;
-      UI.setStatus('connected', 'Ready');
 
-      // If not already in a session, try to resume from localStorage
-      if (state.view === 'home') {
-        const stored = loadSessionFromStorage();
-        if (stored) {
-          WS.setResumeCredentials({
-            sessionId: stored.session_id,
-            deviceId: stored.device_id,
-            resumeToken: stored.resume_token,
-          });
-          WS.tryResumeSession();
-        }
+      const intent = state.pendingIntent;
+      state.pendingIntent = null;
+
+      if (!intent) {
+        // No intent means this is a reconnect; ws.js re-sends resume itself.
+        UI.setStatus('connected', 'Connected');
+        return;
       }
+
+      if (intent.type === 'create') {
+        WS.send({ type: 'create_session' });
+      } else if (intent.type === 'join') {
+        WS.send({ type: 'join_session', code: intent.code });
+      }
+    });
+
+    // The code we picked was already taken — pick another and retry.
+    WS.on('code_taken', () => {
+      if (state.createRetries >= MAX_CODE_RETRIES) {
+        UI.showToast('Could not start a session. Please try again.', 'error');
+        resetToHome();
+        return;
+      }
+      state.createRetries += 1;
+      startCreateSession();
     });
 
     // Session created
@@ -396,10 +473,8 @@
     WS.disconnect();
     resetToHome();
 
-    // Reconnect for a fresh start
-    setTimeout(() => {
-      WS.connect();
-    }, 300);
+    // Nothing to reconnect to: the next session opens its own connection.
+    UI.setStatus('idle', 'Ready to pair');
   }
 
   /**

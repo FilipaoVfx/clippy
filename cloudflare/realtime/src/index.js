@@ -231,12 +231,15 @@ export class ClippyCoordinator extends DurableObject {
     const server = pair[1];
     const socketId = generateId();
     const ip = getIp(request);
+    // The code this object was addressed with. Every socket that reaches this
+    // object carries the same one, because routing is keyed on it.
+    const doCode = String(new URL(request.url).searchParams.get("code") || "").toUpperCase();
 
     // Hibernation API: the runtime holds the connection open while this object
     // is evicted from memory, so idle sessions stop accruing duration charges.
     // The socketId is used as a tag so it can be looked up again after a wake.
     this.ctx.acceptWebSocket(server, [socketId]);
-    server.serializeAttachment({ socketId, ip, code: null });
+    server.serializeAttachment({ socketId, ip, code: null, doCode });
 
     this.sendSocket(server, {
       type: "connected",
@@ -337,6 +340,16 @@ export class ClippyCoordinator extends DurableObject {
     }
   }
 
+  /** The session code this object owns, taken from the connection URL. */
+  doCodeOfSocket(socketId) {
+    const socket = this.socketById(socketId);
+    if (!socket) {
+      return "";
+    }
+    const attachment = this.attachmentOf(socket);
+    return (attachment && attachment.doCode) || "";
+  }
+
   ipOfSocket(socketId) {
     const socket = this.socketById(socketId);
     if (!socket) {
@@ -393,7 +406,21 @@ export class ClippyCoordinator extends DurableObject {
       return;
     }
 
-    const code = generateCode(new Set(Object.keys(this.stateData.sessionsByCode)));
+    // The code is chosen by the client and encoded in the connection URL, which
+    // is what routes it to this object. Generating one here would be pointless:
+    // it would belong to a different object than the one the client reached.
+    const code = this.doCodeOfSocket(socketId);
+    if (!validateCode(code)) {
+      this.sendById(socketId, { type: "error", message: "Connection is missing a valid session code" });
+      return;
+    }
+
+    if (this.stateData.sessionsByCode[code]) {
+      // Collision: the client picks another code and reconnects.
+      this.sendById(socketId, { type: "code_taken", code });
+      return;
+    }
+
     const sessionId = generateId();
     const deviceId = generateId();
     const resumeToken = generateResumeToken();
@@ -435,6 +462,13 @@ export class ClippyCoordinator extends DurableObject {
     const code = String(data.code || "").toUpperCase();
     if (!validateCode(code)) {
       this.sendById(socketId, { type: "error", message: "Invalid code format. Use format: ABC-12K" });
+      return;
+    }
+
+    // Sessions are sharded by code, so a request for a different code than the
+    // one that routed here can only be a client bug or a probe.
+    if (code !== this.doCodeOfSocket(socketId)) {
+      this.sendById(socketId, { type: "error", message: "Session not found or expired" });
       return;
     }
 
@@ -892,9 +926,21 @@ export class ClippyCoordinator extends DurableObject {
   }
 }
 
+/**
+ * Route each session to its own Durable Object, keyed by the pairing code.
+ *
+ * A single shared coordinator would put every user's traffic through one
+ * object, which caps the whole service at that object's request throughput.
+ * Sharding by code means concurrent sessions no longer contend with each other.
+ */
+export function coordinatorNameFor(request) {
+  const code = String(new URL(request.url).searchParams.get("code") || "").toUpperCase();
+  return validateCode(code) ? code : "lobby";
+}
+
 export default {
   async fetch(request, env) {
-    const id = env.CLIPPY_COORDINATOR.idFromName("global");
+    const id = env.CLIPPY_COORDINATOR.idFromName(coordinatorNameFor(request));
     const stub = env.CLIPPY_COORDINATOR.get(id);
     return stub.fetch(request);
   },

@@ -2,8 +2,15 @@ const SPA_ENTRY = "/index.html";
 const HEALTH_PATH = "/health";
 const WS_PATH = "/ws";
 
-function getCoordinator(env) {
-  const coordinatorName = env.CLIPPY_COORDINATOR_NAME || "global";
+const CODE_PATTERN = /^[A-Z]{3}-[0-9]{2}[A-Z]$/;
+
+/**
+ * Sessions are sharded across Durable Objects by pairing code, so concurrent
+ * sessions do not contend for a single object's request throughput.
+ */
+function getCoordinator(env, request) {
+  const code = String(new URL(request.url).searchParams.get("code") || "").toUpperCase();
+  const coordinatorName = CODE_PATTERN.test(code) ? code : env.CLIPPY_COORDINATOR_NAME || "lobby";
   const id = env.CLIPPY_COORDINATOR.idFromName(coordinatorName);
   return env.CLIPPY_COORDINATOR.get(id);
 }
@@ -61,12 +68,17 @@ export default {
         return new Response("Expected websocket upgrade.", { status: 426 });
       }
 
-      return getCoordinator(env).fetch(request);
+      return getCoordinator(env, request).fetch(request);
     }
 
     if (url.pathname === HEALTH_PATH) {
-      return getCoordinator(env).fetch(
-        new Request("https://clippy.internal/health", {
+      // Preserve the code so the probe reaches the shard being asked about.
+      const probeUrl = new URL("https://clippy.internal/health");
+      const code = url.searchParams.get("code");
+      if (code) probeUrl.searchParams.set("code", code);
+
+      return getCoordinator(env, request).fetch(
+        new Request(probeUrl, {
           method: "GET",
         })
       );

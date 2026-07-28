@@ -150,6 +150,11 @@ body {
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
+.status-dot.idle {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
 .status-dot.disconnected {
   background: var(--error);
   box-shadow: 0 0 8px var(--error-glow);

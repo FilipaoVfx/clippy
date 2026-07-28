@@ -4,7 +4,7 @@
  * and reconnection resilience — the sources of the reported expiry/reconnect failures.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClippyCoordinator } from '../../cloudflare/realtime/src/index.js';
+import { ClippyCoordinator, coordinatorNameFor } from '../../cloudflare/realtime/src/index.js';
 
 // ─── Mock infrastructure ─────────────────────────────────────────────────────
 
@@ -99,9 +99,13 @@ function installWebSocketPairMock() {
   };
 }
 
-function makeWsRequest(ip = '1.2.3.4') {
+// Sessions are sharded by code, so a coordinator instance owns exactly one.
+// Every socket in a test therefore connects with the same code.
+const TEST_CODE = 'ABC-12K';
+
+function makeWsRequest(ip = '1.2.3.4', code = TEST_CODE) {
   return {
-    url: 'https://example.com/ws',
+    url: `https://example.com/ws?code=${encodeURIComponent(code)}`,
     headers: {
       get: (h) => {
         if (h === 'Upgrade') return 'websocket';
@@ -122,8 +126,8 @@ async function newCoordinator(storageData = undefined, envOverrides = {}) {
   return { coord, storage };
 }
 
-async function openSocket(coord, ip = '1.2.3.4') {
-  const req = makeWsRequest(ip);
+async function openSocket(coord, ip = '1.2.3.4', code = TEST_CODE) {
+  const req = makeWsRequest(ip, code);
   await coord.fetch(req);
   const [, server] = _lastWsPair;
   const socketId = server.messages[0]?.socketId;
@@ -148,6 +152,62 @@ beforeEach(() => {
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('ClippyCoordinator — sharding by session code', () => {
+  it('creates the session under the code carried in the connection URL', async () => {
+    const { coord } = await newCoordinator();
+    const { server } = await openSocket(coord, '1.1.1.1', 'ZZZ-42Q');
+
+    await sendMsg(coord, server, { type: 'create_session' });
+
+    expect(server.find('session_created').code).toBe('ZZZ-42Q');
+  });
+
+  it('reports code_taken instead of creating a second session in the same shard', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'create_session' });
+
+    expect(s2.find('code_taken')).toBeDefined();
+    expect(s2.find('session_created')).toBeUndefined();
+  });
+
+  it('rejects create_session when the connection carries no valid code', async () => {
+    const { coord } = await newCoordinator();
+    const { server } = await openSocket(coord, '1.1.1.1', 'not-a-code');
+
+    await sendMsg(coord, server, { type: 'create_session' });
+
+    expect(server.find('error')?.message).toMatch(/missing a valid session code/i);
+    expect(server.find('session_created')).toBeUndefined();
+  });
+
+  it('rejects joining a code other than the one that routed here', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    // Socket reached this shard as ABC-12K but asks for a different session.
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code: 'QQQ-11Q' });
+
+    expect(s2.find('error')?.message).toMatch(/not found|expired/i);
+    expect(s2.find('session_joined')).toBeUndefined();
+  });
+
+  it('routes each code to its own object and unknown codes to the lobby', () => {
+    const named = (url) => coordinatorNameFor({ url });
+
+    expect(named('https://x/ws?code=ABC-12K')).toBe('ABC-12K');
+    expect(named('https://x/ws?code=abc-12k')).toBe('ABC-12K');
+    expect(named('https://x/ws?code=QQQ-11Q')).not.toBe(named('https://x/ws?code=ABC-12K'));
+    expect(named('https://x/ws')).toBe('lobby');
+    expect(named('https://x/ws?code=garbage')).toBe('lobby');
+  });
+});
 
 describe('ClippyCoordinator — session creation and state persistence', () => {
   it('creates a session and immediately persists state to storage', async () => {
