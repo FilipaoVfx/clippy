@@ -946,6 +946,42 @@ body {
   margin-top: 4px;
 }
 
+/* ---- Pairing QR ---- */
+.qr-panel {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 4px;
+}
+
+.qr-panel.visible {
+  display: flex;
+}
+
+.qr-code {
+  width: 190px;
+  max-width: 60vw;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  /* The quiet zone must stay light for the code to scan reliably. */
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  line-height: 0;
+}
+
+.qr-code svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.qr-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* ---- Transfer progress (RF-15) ---- */
 .transfer-progress {
   display: none;

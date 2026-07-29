@@ -104,7 +104,12 @@
             </svg>
           </button>
         </div>
-        <p class="waiting-hint">Enter this code on your other device to connect</p>
+        <div class="qr-panel" id="qr-panel">
+          <div class="qr-code" id="qr-code"></div>
+          <p class="qr-hint">Scan with your phone camera to join</p>
+        </div>
+
+        <p class="waiting-hint">Or enter this code on your other device</p>
         <div class="ttl-bar">
           <div class="ttl-progress" id="ttl-progress"></div>
         </div>
@@ -227,6 +232,7 @@
   <!-- Toast Notifications -->
   <div class="toast-container" id="toast-container"></div>
 
+  <script defer src="js/qr.js"></script>
   <script defer src="js/ws.js"></script>
   <script defer src="js/ui.js"></script>
   <script defer src="js/app.js"></script>

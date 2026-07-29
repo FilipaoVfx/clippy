@@ -24,6 +24,7 @@ const SHELL = [
   '/',
   '/index.html',
   '/css/style.css',
+  '/js/qr.js',
   '/js/ws.js',
   '/js/ui.js',
   '/js/app.js',

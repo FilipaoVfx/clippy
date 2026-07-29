@@ -196,6 +196,13 @@ const WS = (() => {
     stopKeepalive();
     currentCode = null;
     if (socket) {
+      // Detach first: close() fires asynchronously, so if a new connection has
+      // already started by then, the old socket's onclose would schedule a
+      // reconnect that fights with it.
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
       socket.close(1000, 'User disconnect');
       socket = null;
     }

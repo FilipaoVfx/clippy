@@ -20,6 +20,9 @@ const UI = (() => {
     els.btnJoin = document.getElementById('btn-join');
 
     els.codeText = document.getElementById('code-text');
+    els.qrPanel = document.getElementById('qr-panel');
+    els.qrCode = document.getElementById('qr-code');
+    els.qrHint = document.querySelector('.qr-hint');
     els.btnCopyCode = document.getElementById('btn-copy-code');
     els.ttlProgress = document.getElementById('ttl-progress');
     els.ttlText = document.getElementById('ttl-text');
@@ -55,10 +58,12 @@ const UI = (() => {
 
     const target = targetMap[viewName];
     if (target) {
-      // Small delay for animation re-trigger
-      requestAnimationFrame(() => {
-        target.classList.add('active');
-      });
+      // Force a reflow so the entry animation replays, then switch synchronously.
+      // requestAnimationFrame would be simpler but does not run in a hidden tab,
+      // which would leave the view stuck if a device pairs while the tab is in
+      // the background.
+      void target.offsetWidth;
+      target.classList.add('active');
     }
   }
 
@@ -80,6 +85,31 @@ const UI = (() => {
    */
   function showCode(code) {
     els.codeText.textContent = code;
+  }
+
+  /**
+   * Render the pairing QR for a join URL.
+   *
+   * The SVG is built in-tree and injected as markup — the only value that
+   * reaches it is the URL we just constructed from our own origin and a code
+   * that already matched the pairing pattern.
+   */
+  function showPairingQR(url) {
+    if (!els.qrCode) return;
+    try {
+      els.qrCode.innerHTML = QR.render(url);
+      els.qrPanel.classList.add('visible');
+    } catch (err) {
+      // A missing QR is not worth blocking pairing over — the code still works.
+      console.error('[UI] QR render failed:', err);
+      els.qrPanel.classList.remove('visible');
+    }
+  }
+
+  function clearPairingQR() {
+    if (!els.qrCode) return;
+    els.qrCode.innerHTML = '';
+    els.qrPanel.classList.remove('visible');
   }
 
   /**
@@ -436,6 +466,8 @@ const UI = (() => {
     showView,
     setStatus,
     showCode,
+    showPairingQR,
+    clearPairingQR,
     setConnectedCode,
     updateTTL,
     addClipToFeed,
