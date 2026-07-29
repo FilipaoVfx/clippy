@@ -11,6 +11,15 @@
   "background_color": "#0a0e1a",
   "theme_color": "#0a0e1a",
   "categories": ["productivity", "utilities"],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.webmanifest"
+    }
+  ],
   "icons": [
     {
       "src": "/icon.svg",

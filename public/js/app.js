@@ -86,7 +86,59 @@
    * exists — and not opening a socket on every page load avoids spinning up a
    * Durable Object for visitors who never pair.
    */
+  const CODE_PATTERN = /^[A-Z]{3}-[0-9]{2}[A-Z]$/;
+
+  /**
+   * A code in the URL means we got here from a scanned pairing QR.
+   * Consumed once and stripped, so a refresh does not re-trigger the join.
+   */
+  function codeFromUrl() {
+    const code = (new URLSearchParams(location.search).get('code') || '').toUpperCase();
+    if (!CODE_PATTERN.test(code)) return null;
+
+    const url = new URL(location.href);
+    url.searchParams.delete('code');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    return code;
+  }
+
+  const isStandalone = () =>
+    window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+  /**
+   * Whether this device already has Clippy installed.
+   *
+   * There is no web API to detect this from the *other* device, nor to launch
+   * an installed PWA from a browser tab — the most we can do is notice it here
+   * and point the user at it. Chromium-only; everywhere else this is false.
+   */
+  async function isAppInstalled() {
+    if (!navigator.getInstalledRelatedApps) return false;
+    try {
+      const apps = await navigator.getInstalledRelatedApps();
+      return apps.some((app) => app.platform === 'webapp');
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async function maybeSuggestApp() {
+    if (isStandalone()) return; // already running as the app
+    if (await isAppInstalled()) {
+      UI.showToast('You have Clippy installed — open it for the full app.', 'info', 5000);
+    }
+  }
+
   function restoreOrIdle() {
+    // A scanned QR wins over a stored session: the user just asked for this one.
+    const scanned = codeFromUrl();
+    if (scanned) {
+      maybeSuggestApp();
+      clearSessionStorage();
+      startJoinSession(scanned);
+      return;
+    }
+
     const stored = loadSessionFromStorage();
     if (stored && stored.code) {
       WS.setResumeCredentials({
@@ -478,6 +530,9 @@
       state.view = 'waiting';
 
       UI.showCode(data.code);
+      // Scanning this opens the app on the other device with the code already
+      // filled in, so pairing needs no typing.
+      UI.showPairingQR(`${location.origin}/?code=${encodeURIComponent(data.code)}`);
       UI.showView('waiting');
       startTTLTimer();
 
@@ -743,6 +798,7 @@
     discardIncoming();
 
     UI.showView('home');
+    UI.clearPairingQR();
     UI.clearFeed();
 
     // Clear inputs
