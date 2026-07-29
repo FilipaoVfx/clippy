@@ -4,7 +4,7 @@
  * and reconnection resilience — the sources of the reported expiry/reconnect failures.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClippyCoordinator } from '../../cloudflare/realtime/src/index.js';
+import { ClippyCoordinator, coordinatorNameFor } from '../../cloudflare/realtime/src/index.js';
 
 // ─── Mock infrastructure ─────────────────────────────────────────────────────
 
@@ -24,9 +24,23 @@ function createMockStorage(initial = undefined) {
 }
 
 function createMockCtx(storage) {
+  // Mirrors the hibernation API: the runtime owns the sockets and hands them
+  // back via getWebSockets(), optionally filtered by the tags passed to accept.
+  const accepted = [];
+
   return {
     storage,
     blockConcurrencyWhile: async (fn) => await fn(),
+    acceptWebSocket: (ws, tags = []) => {
+      ws._tags = tags;
+      accepted.push(ws);
+    },
+    getWebSockets: (tag) => {
+      const live = accepted.filter((ws) => !ws.closed);
+      if (tag === undefined) return live;
+      return live.filter((ws) => (ws._tags || []).includes(tag));
+    },
+    setWebSocketAutoResponse: () => {},
   };
 }
 
@@ -45,15 +59,23 @@ function createMockEnv(overrides = {}) {
 class MockWebSocket {
   constructor() {
     this.messages = [];
+    this.binary = [];
     this.closed = false;
     this.closeCode = null;
     this.closeReason = null;
     this._listeners = {};
   }
-  send(raw) { this.messages.push(JSON.parse(raw)); }
+  send(raw) {
+    if (typeof raw === 'string') this.messages.push(JSON.parse(raw));
+    else this.binary.push(raw);
+  }
   close(code, reason) { this.closed = true; this.closeCode = code; this.closeReason = reason; }
   accept() {}
   addEventListener(event, fn) { this._listeners[event] = fn; }
+  // Attachments are structured-cloned by the real runtime; round-trip through
+  // JSON so tests catch code that relies on holding a live reference.
+  serializeAttachment(value) { this._attachment = JSON.stringify(value); }
+  deserializeAttachment() { return this._attachment ? JSON.parse(this._attachment) : null; }
   last() { return this.messages[this.messages.length - 1]; }
   find(type) { return this.messages.find(m => m.type === type); }
 }
@@ -81,9 +103,13 @@ function installWebSocketPairMock() {
   };
 }
 
-function makeWsRequest(ip = '1.2.3.4') {
+// Sessions are sharded by code, so a coordinator instance owns exactly one.
+// Every socket in a test therefore connects with the same code.
+const TEST_CODE = 'ABC-12K';
+
+function makeWsRequest(ip = '1.2.3.4', code = TEST_CODE) {
   return {
-    url: 'https://example.com/ws',
+    url: `https://example.com/ws?code=${encodeURIComponent(code)}`,
     headers: {
       get: (h) => {
         if (h === 'Upgrade') return 'websocket';
@@ -104,24 +130,25 @@ async function newCoordinator(storageData = undefined, envOverrides = {}) {
   return { coord, storage };
 }
 
-async function openSocket(coord, ip = '1.2.3.4') {
-  const req = makeWsRequest(ip);
+async function openSocket(coord, ip = '1.2.3.4', code = TEST_CODE) {
+  const req = makeWsRequest(ip, code);
   await coord.fetch(req);
   const [, server] = _lastWsPair;
   const socketId = server.messages[0]?.socketId;
   return { server, socketId };
 }
 
-async function flushAsync() {
-  await new Promise(resolve => setTimeout(resolve, 0));
+// The hibernation handlers are plain async methods, so they can be awaited
+// directly — no macrotask flushing needed as with the old event listeners.
+async function sendMsg(coord, server, msg) {
+  await coord.webSocketMessage(server, JSON.stringify(msg));
+  return server.last();
 }
 
-async function sendMsg(coord, server, msg) {
-  // The DO message listener does not return the inner async Promise, so we must
-  // flush the macrotask queue (setTimeout 0) to let all awaited microtasks settle.
-  server._listeners.message({ data: JSON.stringify(msg) });
-  await new Promise(resolve => setTimeout(resolve, 0));
-  return server.last();
+/** Simulate the peer dropping the connection. */
+async function closeSocket(coord, server) {
+  server.closed = true;
+  await coord.webSocketClose(server);
 }
 
 beforeEach(() => {
@@ -129,6 +156,62 @@ beforeEach(() => {
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('ClippyCoordinator — sharding by session code', () => {
+  it('creates the session under the code carried in the connection URL', async () => {
+    const { coord } = await newCoordinator();
+    const { server } = await openSocket(coord, '1.1.1.1', 'ZZZ-42Q');
+
+    await sendMsg(coord, server, { type: 'create_session' });
+
+    expect(server.find('session_created').code).toBe('ZZZ-42Q');
+  });
+
+  it('reports code_taken instead of creating a second session in the same shard', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'create_session' });
+
+    expect(s2.find('code_taken')).toBeDefined();
+    expect(s2.find('session_created')).toBeUndefined();
+  });
+
+  it('rejects create_session when the connection carries no valid code', async () => {
+    const { coord } = await newCoordinator();
+    const { server } = await openSocket(coord, '1.1.1.1', 'not-a-code');
+
+    await sendMsg(coord, server, { type: 'create_session' });
+
+    expect(server.find('error')?.message).toMatch(/missing a valid session code/i);
+    expect(server.find('session_created')).toBeUndefined();
+  });
+
+  it('rejects joining a code other than the one that routed here', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    // Socket reached this shard as ABC-12K but asks for a different session.
+    const { server: s2 } = await openSocket(coord, '2.2.2.2');
+    await sendMsg(coord, s2, { type: 'join_session', code: 'QQQ-11Q' });
+
+    expect(s2.find('error')?.message).toMatch(/not found|expired/i);
+    expect(s2.find('session_joined')).toBeUndefined();
+  });
+
+  it('routes each code to its own object and unknown codes to the lobby', () => {
+    const named = (url) => coordinatorNameFor({ url });
+
+    expect(named('https://x/ws?code=ABC-12K')).toBe('ABC-12K');
+    expect(named('https://x/ws?code=abc-12k')).toBe('ABC-12K');
+    expect(named('https://x/ws?code=QQQ-11Q')).not.toBe(named('https://x/ws?code=ABC-12K'));
+    expect(named('https://x/ws')).toBe('lobby');
+    expect(named('https://x/ws?code=garbage')).toBe('lobby');
+  });
+});
 
 describe('ClippyCoordinator — session creation and state persistence', () => {
   it('creates a session and immediately persists state to storage', async () => {
@@ -244,8 +327,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s1, { type: 'create_session' });
     const { code } = s1.find('session_created');
 
-    s1._listeners.close({ code: 1001, reason: 'gone' });
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     const session = coord.stateData.sessionsByCode[code];
     const device = session.devices.find(d => d.socketId === socketId);
@@ -258,8 +340,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s1, { type: 'create_session' });
     const { code } = s1.find('session_created');
 
-    s1._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     expect(coord.stateData.sessionsByCode[code]).toBeDefined();
   });
@@ -291,8 +372,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s2, { type: 'join_session', code });
 
     s1.messages = [];
-    s2._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s2);
 
     const notice = s1.find('device_disconnected');
     expect(notice).toBeDefined();
@@ -310,8 +390,7 @@ describe('ClippyCoordinator — device disconnect and reconnect lifecycle', () =
     await sendMsg(coord, s2, { type: 'join_session', code });
     const { sessionId: sid2, deviceId: did2, resumeToken: rt2 } = s2.find('session_joined');
 
-    s2._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s2);
     s1.messages = [];
 
     const { server: s3 } = await openSocket(coord, '2.2.2.2');
@@ -377,8 +456,7 @@ describe('ClippyCoordinator — alarm scheduling for maximum persistence', () =>
     const { server: s1 } = await openSocket(coord);
     await sendMsg(coord, s1, { type: 'create_session' });
 
-    s1._listeners.close({});
-    await flushAsync();
+    await closeSocket(coord, s1);
 
     // Alarm should fire before full session TTL (300s) because disconnect TTL is 60s
     const alarmTime = storage.getAlarmTime();
@@ -453,6 +531,52 @@ describe('ClippyCoordinator — rate limiting', () => {
 
     const errors = s1.messages.filter(m => m.type === 'error' && /rate limit/i.test(m.message));
     expect(errors).toHaveLength(0);
+  });
+
+  it('blocks payloads exceeding the byte budget even when message count is fine', async () => {
+    // Generous message allowance, tiny byte allowance: the byte lane must be
+    // what rejects the payload.
+    const { coord } = await newCoordinator(undefined, {
+      RATE_LIMIT_MAX: '100',
+      RATE_LIMIT_BYTES: '200',
+      MAX_MESSAGE_SIZE: '10240',
+    });
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    await sendMsg(coord, s1, { type: 'send_clip', content: 'x'.repeat(2000) });
+
+    const errors = s1.messages.filter(m => m.type === 'error' && /rate limit/i.test(m.message));
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('refills the byte budget over time', async () => {
+    const { coord } = await newCoordinator(undefined, {
+      RATE_LIMIT_BYTES: '1000',
+      RATE_LIMIT_WINDOW_MS: '1000',
+    });
+
+    // Drain the byte lane, then advance the clock past a full window.
+    expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(true);
+    expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(false);
+
+    const realNow = Date.now;
+    Date.now = () => realNow() + 2000;
+    try {
+      expect(coord.checkRateLimit('9.9.9.9', { byteCost: 1000 })).toBe(true);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  it('does not spend message tokens for zero-cost lanes (chunked transfers)', async () => {
+    const { coord } = await newCoordinator(undefined, { RATE_LIMIT_MAX: '2' });
+
+    // A chunked transfer sends many frames; charging each one a message token
+    // would abort the transfer after RATE_LIMIT_MAX frames.
+    for (let i = 0; i < 50; i++) {
+      expect(coord.checkRateLimit('8.8.8.8', { msgCost: 0, byteCost: 1024 })).toBe(true);
+    }
   });
 });
 
@@ -547,7 +671,7 @@ describe('ClippyCoordinator — invalid messages', () => {
     const { coord } = await newCoordinator();
     const { server: s1 } = await openSocket(coord);
 
-    await s1._listeners.message({ data: 'not json{{{' });
+    await coord.webSocketMessage(s1, 'not json{{{');
 
     expect(s1.find('error')).toBeDefined();
   });
@@ -570,6 +694,203 @@ describe('ClippyCoordinator — invalid messages', () => {
 
     const err = s1.find('error');
     expect(err?.message).toMatch(/invalid code/i);
+  });
+});
+
+// ─── Chunked transfers (RF-15) ───────────────────────────────────────────────
+
+const TRANSFER_ID = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
+function chunkFrame(transferId, index, payloadBytes) {
+  const buf = new Uint8Array(21 + payloadBytes.length);
+  buf[0] = 1;
+  for (let i = 0; i < 16; i += 1) {
+    buf[1 + i] = parseInt(transferId.substr(i * 2, 2), 16);
+  }
+  new DataView(buf.buffer).setUint32(17, index, false);
+  buf.set(payloadBytes, 21);
+  return buf.buffer;
+}
+
+/** Open a session with two devices and return both sockets. */
+async function pairedSession(coord, envOverrides) {
+  const { server: s1 } = await openSocket(coord, '1.1.1.1');
+  await sendMsg(coord, s1, { type: 'create_session' });
+  const { code } = s1.find('session_created');
+  const { server: s2 } = await openSocket(coord, '2.2.2.2');
+  await sendMsg(coord, s2, { type: 'join_session', code });
+  s1.messages = [];
+  s2.messages = [];
+  return { s1, s2, code };
+}
+
+function startMsg(overrides = {}) {
+  return {
+    type: 'transfer_start',
+    transferId: TRANSFER_ID,
+    name: 'clip.mp4',
+    mimeType: 'video/mp4',
+    size: 1000,
+    chunkSize: 500,
+    chunkCount: 2,
+    ...overrides,
+  };
+}
+
+describe('ClippyCoordinator — chunked transfers (RF-15)', () => {
+  it('announces an incoming transfer to the peer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg());
+
+    const incoming = s1.find('transfer_incoming');
+    expect(incoming).toBeDefined();
+    expect(incoming.transferId).toBe(TRANSFER_ID);
+    expect(incoming.mimeType).toBe('video/mp4');
+    expect(incoming.chunkCount).toBe(2);
+  });
+
+  it('relays chunk frames to the peer byte-for-byte', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+
+    const payload = new Uint8Array([9, 8, 7, 6, 5]);
+    const frame = chunkFrame(TRANSFER_ID, 0, payload);
+    await coord.webSocketMessage(s2, frame);
+
+    const relayed = s1.binary[s1.binary.length - 1];
+    expect(relayed).toBeDefined();
+    expect(new Uint8Array(relayed)).toEqual(new Uint8Array(frame));
+  });
+
+  it('never writes transfer payload to Durable Object storage', async () => {
+    const { coord, storage } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 4096, chunkSize: 1024, chunkCount: 4 }));
+
+    const putsBefore = storage.put.mock.calls.length;
+    for (let i = 0; i < 4; i += 1) {
+      await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, i, new Uint8Array(1024)));
+    }
+
+    expect(storage.put.mock.calls.length).toBe(putsBefore);
+  });
+
+  it('signals completion once every declared byte has been relayed', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 20, chunkSize: 10, chunkCount: 2 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 1, new Uint8Array(10)));
+    await sendMsg(coord, s2, { type: 'transfer_end', transferId: TRANSFER_ID });
+
+    expect(s1.find('transfer_complete')).toBeDefined();
+  });
+
+  it('reports an abort when the transfer ends short of its declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 20, chunkSize: 10, chunkCount: 2 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+    await sendMsg(coord, s2, { type: 'transfer_end', transferId: TRANSFER_ID });
+
+    expect(s1.find('transfer_complete')).toBeUndefined();
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/ended early/i);
+  });
+
+  it('aborts a sender that overruns its declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 10, chunkSize: 10, chunkCount: 1 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(999)));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/exceeded declared size/i);
+    expect(s1.binary).toHaveLength(0);
+  });
+
+  it('rejects a video above the size limit', async () => {
+    const { coord } = await newCoordinator(undefined, { VIDEO_MAX_BYTES: '1000' });
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ size: 5000, chunkSize: 1000, chunkCount: 5 }));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/exceeds/i);
+  });
+
+  it('rejects an unsupported container', async () => {
+    const { coord } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ mimeType: 'application/zip' }));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/unsupported format/i);
+  });
+
+  it('rejects framing that does not match the declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ size: 1000, chunkSize: 100, chunkCount: 3 }));
+
+    expect(s2.find('error')?.message).toMatch(/invalid transfer framing/i);
+  });
+
+  it('ignores chunks for a transfer that was never started', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+
+    expect(s1.binary).toHaveLength(0);
+  });
+
+  it('does not let one socket push chunks onto another socket\'s transfer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+    s1.binary.length = 0;
+
+    // s1 is the receiver, not the owner of TRANSFER_ID.
+    await coord.webSocketMessage(s1, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+
+    expect(s2.binary).toHaveLength(0);
+  });
+
+  it('refuses to start a transfer with no peers to receive it', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    await sendMsg(coord, s1, startMsg());
+
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/no connected peers/i);
+  });
+
+  it('tells the peer when the sender disconnects mid-transfer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+
+    await closeSocket(coord, s2);
+
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/sender disconnected/i);
+  });
+
+  it('routes receiver acks back to the sender only', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+    s1.messages = [];
+
+    await sendMsg(coord, s1, { type: 'transfer_ack', transferId: TRANSFER_ID, upTo: 1 });
+
+    expect(s2.find('transfer_ack')?.upTo).toBe(1);
+    expect(s1.find('transfer_ack')).toBeUndefined();
   });
 });
 

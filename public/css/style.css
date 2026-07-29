@@ -150,6 +150,11 @@ body {
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
+.status-dot.idle {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
 .status-dot.disconnected {
   background: var(--error);
   box-shadow: 0 0 8px var(--error-glow);
@@ -939,6 +944,54 @@ body {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+/* ---- Transfer progress (RF-15) ---- */
+.transfer-progress {
+  display: none;
+  margin-top: 12px;
+}
+
+.transfer-progress.visible {
+  display: block;
+}
+
+.transfer-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.transfer-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+.transfer-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--accent-gradient);
+  transition: width 120ms linear;
+}
+
+/* ---- Received Video Items ---- */
+.video-wrapper {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  margin-bottom: 8px;
+}
+
+.received-video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-sm);
 }
 
 /* ---- Received Image Items ---- */

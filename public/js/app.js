@@ -11,7 +11,30 @@
     ttlInterval: null,
     sessionCreatedAt: null,
     sessionTTL: 300000,  // 5 minutes
+    pendingIntent: null, // what to do once the socket is up
+    createRetries: 0,    // guards against a code-collision loop
   };
+
+  // ── Session codes (RF-02) ────────────────────────────────
+  // Sessions are sharded server-side by code, so the code has to exist before
+  // connecting. The client picks it and the server rejects collisions, which
+  // keeps pairing to a single connection with no reconnect round-trip.
+  const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O, they read as 1/0
+  const CODE_DIGITS = '0123456789';
+  const MAX_CODE_RETRIES = 5;
+
+  function pick(alphabet) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return alphabet[values[0] % alphabet.length];
+  }
+
+  function generateCode() {
+    return (
+      pick(CODE_LETTERS) + pick(CODE_LETTERS) + pick(CODE_LETTERS) + '-' +
+      pick(CODE_DIGITS) + pick(CODE_DIGITS) + pick(CODE_LETTERS)
+    );
+  }
 
   // ── localStorage helpers (RF-09) ─────────────────────────
   const STORAGE_KEY = 'clippy_session';
@@ -52,8 +75,49 @@
     UI.init();
     bindEvents();
     WS.setupAutoReconnect();
-    WS.connect();
     setupWSListeners();
+    restoreOrIdle();
+  }
+
+  /**
+   * Connect only when there is a session to connect to.
+   *
+   * Sessions are sharded by code, so there is nothing to connect to before one
+   * exists — and not opening a socket on every page load avoids spinning up a
+   * Durable Object for visitors who never pair.
+   */
+  function restoreOrIdle() {
+    const stored = loadSessionFromStorage();
+    if (stored && stored.code) {
+      WS.setResumeCredentials({
+        sessionId: stored.session_id,
+        deviceId: stored.device_id,
+        resumeToken: stored.resume_token,
+      });
+      UI.setStatus('idle', 'Reconnecting...');
+      WS.connect(stored.code); // resume is sent automatically once open
+      return;
+    }
+    UI.setStatus('idle', 'Ready to pair');
+  }
+
+  /** Start a brand new session under a locally generated code. */
+  function startCreateSession() {
+    const code = generateCode();
+    WS.clearResumeCredentials(); // a stale token would trigger a resume instead
+    state.pendingIntent = { type: 'create' };
+    UI.setStatus('idle', 'Creating session...');
+    WS.disconnect();
+    WS.connect(code);
+  }
+
+  /** Join an existing session by its code. */
+  function startJoinSession(code) {
+    WS.clearResumeCredentials();
+    state.pendingIntent = { type: 'join', code };
+    UI.setStatus('idle', 'Joining...');
+    WS.disconnect();
+    WS.connect(code);
   }
 
   // ── Image transfer helpers (RF-13) ──────────────────────
@@ -82,6 +146,136 @@
     reader.readAsDataURL(file);
   }
 
+  // ── Chunked video transfer (RF-15) ──────────────────────
+  const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+  const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+  const CHUNK_SIZE = 512 * 1024;
+  const FRAME_VERSION = 1;
+  const HEADER_BYTES = 21;
+  // Chunks in flight before waiting for an ack. Caps what the relay has to hold
+  // for a slow receiver, and what we lose if the connection drops.
+  const WINDOW = 8;
+  const ACK_EVERY = 4;
+  const BUFFER_LIMIT = 2 * 1024 * 1024;
+
+  let outgoing = null;  // transfer we are sending
+  let incoming = null;  // transfer we are receiving
+
+  function randomTransferId() {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function buildFrame(transferId, index, payload) {
+    const frame = new Uint8Array(HEADER_BYTES + payload.byteLength);
+    frame[0] = FRAME_VERSION;
+    for (let i = 0; i < 16; i += 1) {
+      frame[1 + i] = parseInt(transferId.substr(i * 2, 2), 16);
+    }
+    new DataView(frame.buffer).setUint32(17, index, false);
+    frame.set(new Uint8Array(payload), HEADER_BYTES);
+    return frame.buffer;
+  }
+
+  function sendVideoFile(file) {
+    if (outgoing) {
+      UI.showToast('Another video is already being sent.', 'error');
+      return;
+    }
+    if (!ALLOWED_VIDEO_TYPES.has(file.type)) {
+      UI.showToast('Unsupported format. Use MP4, WEBM or MOV.', 'error');
+      return;
+    }
+    if (file.size > VIDEO_MAX_BYTES) {
+      UI.showToast('Video exceeds 50 MB limit.', 'error');
+      return;
+    }
+
+    const chunkCount = Math.ceil(file.size / CHUNK_SIZE);
+    outgoing = {
+      id: randomTransferId(),
+      file,
+      chunkCount,
+      nextChunk: 0,
+      ackedUpTo: -1,
+      started: false,
+    };
+
+    const ok = WS.send({
+      type: 'transfer_start',
+      transferId: outgoing.id,
+      name: file.name,
+      mimeType: file.type,
+      size: file.size,
+      chunkSize: CHUNK_SIZE,
+      chunkCount,
+    });
+
+    if (!ok) {
+      outgoing = null;
+      UI.showToast('Not connected. Cannot send.', 'error');
+      return;
+    }
+
+    UI.showTransferProgress('Sending', 0);
+  }
+
+  /**
+   * Push chunks until the ack window (or the socket buffer) says to wait.
+   * Resumes when the next ack arrives.
+   */
+  async function pumpChunks() {
+    if (!outgoing) return;
+
+    while (
+      outgoing.nextChunk < outgoing.chunkCount &&
+      outgoing.nextChunk - outgoing.ackedUpTo <= WINDOW &&
+      WS.bufferedAmount() < BUFFER_LIMIT
+    ) {
+      const index = outgoing.nextChunk;
+      const start = index * CHUNK_SIZE;
+      const blob = outgoing.file.slice(start, Math.min(start + CHUNK_SIZE, outgoing.file.size));
+
+      let payload;
+      try {
+        payload = await blob.arrayBuffer();
+      } catch (err) {
+        abortOutgoing('Could not read the file');
+        return;
+      }
+      if (!outgoing || outgoing.nextChunk !== index) return; // aborted while reading
+
+      if (!WS.sendBinary(buildFrame(outgoing.id, index, payload))) {
+        abortOutgoing('Connection lost');
+        return;
+      }
+
+      outgoing.nextChunk += 1;
+      UI.showTransferProgress('Sending', outgoing.nextChunk / outgoing.chunkCount);
+    }
+
+    if (outgoing && outgoing.nextChunk >= outgoing.chunkCount) {
+      WS.send({ type: 'transfer_end', transferId: outgoing.id });
+    }
+  }
+
+  function abortOutgoing(reason) {
+    if (!outgoing) return;
+    WS.send({ type: 'transfer_abort', transferId: outgoing.id, reason });
+    outgoing = null;
+    UI.hideTransferProgress();
+    UI.showToast(reason, 'error');
+  }
+
+  /** Drop any partial transfer and release its memory. */
+  function discardIncoming() {
+    if (!incoming) return;
+    incoming.chunks = null;
+    incoming = null;
+    UI.hideTransferProgress();
+  }
+
   /**
    * Bind UI event handlers.
    */
@@ -90,7 +284,8 @@
 
     // Create Session
     els.btnCreate.addEventListener('click', () => {
-      WS.send({ type: 'create_session' });
+      state.createRetries = 0;
+      startCreateSession();
     });
 
     // Join Session — code input
@@ -114,7 +309,7 @@
     els.btnJoin.addEventListener('click', () => {
       const code = UI.getCodeInput();
       if (code) {
-        WS.send({ type: 'join_session', code });
+        startJoinSession(code);
       }
     });
 
@@ -180,6 +375,31 @@
       if (file) sendImageFile(file);
     });
 
+    // Video — browse, and drag-and-drop
+    const inputVideo = document.getElementById('input-video');
+    const btnSendVideo = document.getElementById('btn-send-video');
+    const videoZone = document.getElementById('video-drop-zone');
+
+    btnSendVideo.addEventListener('click', () => inputVideo.click());
+
+    inputVideo.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) sendVideoFile(file);
+      inputVideo.value = '';
+    });
+
+    videoZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      videoZone.classList.add('drag-over');
+    });
+    videoZone.addEventListener('dragleave', () => videoZone.classList.remove('drag-over'));
+    videoZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      videoZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) sendVideoFile(file);
+    });
+
     // Global paste — grab image from clipboard when connected
     document.addEventListener('paste', (e) => {
       if (state.view !== 'connected') return;
@@ -220,23 +440,35 @@
       UI.setStatus('disconnected', 'Connection error');
     });
 
-    // Server welcome
+    // Server welcome — act on whatever we connected in order to do
     WS.on('connected', (data) => {
       state.socketId = data.socketId;
-      UI.setStatus('connected', 'Ready');
 
-      // If not already in a session, try to resume from localStorage
-      if (state.view === 'home') {
-        const stored = loadSessionFromStorage();
-        if (stored) {
-          WS.setResumeCredentials({
-            sessionId: stored.session_id,
-            deviceId: stored.device_id,
-            resumeToken: stored.resume_token,
-          });
-          WS.tryResumeSession();
-        }
+      const intent = state.pendingIntent;
+      state.pendingIntent = null;
+
+      if (!intent) {
+        // No intent means this is a reconnect; ws.js re-sends resume itself.
+        UI.setStatus('connected', 'Connected');
+        return;
       }
+
+      if (intent.type === 'create') {
+        WS.send({ type: 'create_session' });
+      } else if (intent.type === 'join') {
+        WS.send({ type: 'join_session', code: intent.code });
+      }
+    });
+
+    // The code we picked was already taken — pick another and retry.
+    WS.on('code_taken', () => {
+      if (state.createRetries >= MAX_CODE_RETRIES) {
+        UI.showToast('Could not start a session. Please try again.', 'error');
+        resetToHome();
+        return;
+      }
+      state.createRetries += 1;
+      startCreateSession();
     });
 
     // Session created
@@ -321,6 +553,101 @@
       UI.showToast('Sent!', 'success', 1500);
     });
 
+    // ── Chunked video transfer (RF-15) ──────────────────────
+
+    // Receiver: a transfer is being announced.
+    WS.on('transfer_incoming', (data) => {
+      discardIncoming();
+      incoming = {
+        id: data.transferId,
+        name: data.name,
+        mimeType: data.mimeType,
+        size: data.size,
+        chunkCount: data.chunkCount,
+        chunks: new Array(data.chunkCount),
+        received: 0,
+      };
+      UI.showTransferProgress('Receiving', 0);
+      WS.send({ type: 'transfer_ready', transferId: data.transferId });
+    });
+
+    // Receiver: a chunk arrived. Acknowledge so the sender's window advances.
+    WS.on('binary_chunk', (buffer) => {
+      if (!incoming) return;
+
+      const view = new Uint8Array(buffer);
+      if (view.byteLength <= HEADER_BYTES || view[0] !== FRAME_VERSION) return;
+
+      let id = '';
+      for (let i = 0; i < 16; i += 1) id += view[1 + i].toString(16).padStart(2, '0');
+      if (id !== incoming.id) return;
+
+      const index = new DataView(buffer).getUint32(17, false);
+      if (index >= incoming.chunkCount || incoming.chunks[index]) return;
+
+      incoming.chunks[index] = view.slice(HEADER_BYTES);
+      incoming.received += 1;
+      UI.showTransferProgress('Receiving', incoming.received / incoming.chunkCount);
+
+      // Ack every few chunks rather than every one: the window is wide enough
+      // that per-chunk acks are pure overhead.
+      const isLast = incoming.received === incoming.chunkCount;
+      if (isLast || incoming.received % ACK_EVERY === 0) {
+        WS.send({ type: 'transfer_ack', transferId: incoming.id, upTo: index });
+      }
+    });
+
+    // Sender: the window advanced, keep pushing.
+    WS.on('transfer_ack', (data) => {
+      if (!outgoing || data.transferId !== outgoing.id) return;
+      outgoing.ackedUpTo = Math.max(outgoing.ackedUpTo, data.upTo);
+      pumpChunks();
+    });
+
+    // Sender: the peer is ready, start pushing.
+    WS.on('transfer_ready', (data) => {
+      if (!outgoing || data.transferId !== outgoing.id || outgoing.started) return;
+      outgoing.started = true;
+      pumpChunks();
+    });
+
+    // Every byte arrived. Both ends get this: the sender clears its progress,
+    // the receiver assembles the blob.
+    WS.on('transfer_complete', (data) => {
+      if (outgoing && data.transferId === outgoing.id) {
+        outgoing = null;
+        UI.hideTransferProgress();
+        UI.showToast('Video sent!', 'success', 1500);
+        return;
+      }
+
+      if (!incoming || data.transferId !== incoming.id) return;
+
+      if (incoming.received !== incoming.chunkCount) {
+        UI.showToast('Video arrived incomplete.', 'error');
+        discardIncoming();
+        return;
+      }
+
+      const blob = new Blob(incoming.chunks, { type: incoming.mimeType });
+      UI.addVideoToFeed(blob, incoming.name, Date.now());
+      UI.showToast('Video received!', 'info', 2000);
+      discardIncoming();
+    });
+
+    // Either side gave up.
+    WS.on('transfer_aborted', (data) => {
+      if (outgoing && data.transferId === outgoing.id) {
+        outgoing = null;
+        UI.hideTransferProgress();
+        UI.showToast(data.reason || 'Transfer cancelled', 'error');
+      }
+      if (incoming && data.transferId === incoming.id) {
+        discardIncoming();
+        UI.showToast(data.reason || 'Transfer cancelled', 'error');
+      }
+    });
+
     // Image received (RF-13)
     WS.on('receive_image', (data) => {
       UI.addImageToFeed(data.data, data.mimeType, data.timestamp);
@@ -396,10 +723,8 @@
     WS.disconnect();
     resetToHome();
 
-    // Reconnect for a fresh start
-    setTimeout(() => {
-      WS.connect();
-    }, 300);
+    // Nothing to reconnect to: the next session opens its own connection.
+    UI.setStatus('idle', 'Ready to pair');
   }
 
   /**
@@ -409,7 +734,13 @@
     state.view = 'home';
     state.sessionCode = null;
     state.sessionCreatedAt = null;
+    state.pendingIntent = null;
     clearTTLTimer();
+
+    // Drop any transfer in flight and release its buffers. clearFeed() revokes
+    // the object URLs, so nothing received outlives the session.
+    outgoing = null;
+    discardIncoming();
 
     UI.showView('home');
     UI.clearFeed();

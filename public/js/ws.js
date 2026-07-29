@@ -10,25 +10,58 @@ const WS = (() => {
   let intentionalClose = false;
   let resumeCredentials = null;
   let isReconnecting = false;
+  let currentCode = null;
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   const BASE_DELAY = 1000;
+  // Mobile networks and proxies drop idle WebSockets, which is a common cause of
+  // spurious reconnects. The server answers these via setWebSocketAutoResponse,
+  // so they never wake the Durable Object and cost nothing.
+  const KEEPALIVE_MS = 30000;
+  let keepaliveTimer = null;
+
+  function startKeepalive() {
+    stopKeepalive();
+    keepaliveTimer = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        try { socket.send('ping'); } catch (err) { /* next tick will retry */ }
+      }
+    }, KEEPALIVE_MS);
+  }
+
+  function stopKeepalive() {
+    if (keepaliveTimer) {
+      clearInterval(keepaliveTimer);
+      keepaliveTimer = null;
+    }
+  }
 
   /**
-   * Connect to the WebSocket server.
+   * Connect to the WebSocket server for a given session code.
+   *
+   * Sessions are sharded server-side by code, so the code has to be known
+   * before connecting. Callers pass it once; reconnects reuse it.
    */
-  function connect() {
+  function connect(code) {
+    if (code) currentCode = code;
+
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    if (!currentCode) {
+      console.warn('[WS] No session code, not connecting');
       return;
     }
 
     intentionalClose = false;
     isReconnecting = false;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/ws`;
+    const url = `${protocol}//${window.location.host}/ws?code=${encodeURIComponent(currentCode)}`;
 
     try {
       socket = new WebSocket(url);
+      socket.binaryType = 'arraybuffer'; // transfer chunks arrive as raw frames
     } catch (err) {
       console.error('[WS] Connection error:', err);
       emit('connection_error', { message: err.message });
@@ -39,6 +72,7 @@ const WS = (() => {
     socket.onopen = () => {
       console.log('[WS] Connected');
       reconnectAttempts = 0;
+      startKeepalive();
       emit('ws_open');
 
       if (resumeCredentials && !isReconnecting) {
@@ -47,6 +81,15 @@ const WS = (() => {
     };
 
     socket.onmessage = (event) => {
+      // Keepalive reply from setWebSocketAutoResponse — plain text, not JSON.
+      if (event.data === 'pong') return;
+
+      // Transfer chunks are binary frames, not JSON.
+      if (event.data instanceof ArrayBuffer) {
+        emit('binary_chunk', event.data);
+        return;
+      }
+
       try {
         const data = JSON.parse(event.data);
         emit(data.type, data);
@@ -57,6 +100,7 @@ const WS = (() => {
 
     socket.onclose = (event) => {
       console.log(`[WS] Closed: ${event.code} ${event.reason}`);
+      stopKeepalive();
       emit('ws_close', { code: event.code, reason: event.reason });
 
       if (!intentionalClose) {
@@ -122,15 +166,43 @@ const WS = (() => {
   }
 
   /**
+   * Send a raw binary frame (a transfer chunk).
+   */
+  function sendBinary(buffer) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    try {
+      socket.send(buffer);
+      return true;
+    } catch (err) {
+      console.error('[WS] Binary send error:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Bytes queued but not yet handed to the network. The sender watches this so
+   * it does not outrun the socket and grow an unbounded outbound buffer.
+   */
+  function bufferedAmount() {
+    return socket ? socket.bufferedAmount : 0;
+  }
+
+  /**
    * Disconnect intentionally.
    */
   function disconnect() {
     intentionalClose = true;
     clearTimeout(reconnectTimer);
+    stopKeepalive();
+    currentCode = null;
     if (socket) {
       socket.close(1000, 'User disconnect');
       socket = null;
     }
+  }
+
+  function getCode() {
+    return currentCode;
   }
 
   /**
@@ -231,7 +303,10 @@ const WS = (() => {
   return {
     connect,
     send,
+    sendBinary,
+    bufferedAmount,
     disconnect,
+    getCode,
     on,
     off,
     isConnected,
