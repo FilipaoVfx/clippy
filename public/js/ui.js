@@ -32,6 +32,11 @@ const UI = (() => {
     els.clipFeed = document.getElementById('clip-feed');
     els.emptyState = document.getElementById('empty-state');
 
+    els.transferProgress = document.getElementById('transfer-progress');
+    els.transferLabel = document.getElementById('transfer-label');
+    els.transferBar = document.getElementById('transfer-bar');
+    els.transferPct = document.getElementById('transfer-pct');
+
     els.toastContainer = document.getElementById('toast-container');
   }
 
@@ -214,10 +219,109 @@ const UI = (() => {
     }
   }
 
+  // Object URLs handed to the DOM. Tracked so they can be revoked when the
+  // session ends — without that the blobs stay alive in memory even though the
+  // session that carried them is gone, which would break the ephemeral promise.
+  const objectUrls = new Set();
+
+  function trackedObjectUrl(blob) {
+    const url = URL.createObjectURL(blob);
+    objectUrls.add(url);
+    return url;
+  }
+
+  function revokeObjectUrls() {
+    for (const url of objectUrls) URL.revokeObjectURL(url);
+    objectUrls.clear();
+  }
+
+  /**
+   * Add a received video to the feed (RF-15).
+   */
+  function addVideoToFeed(blob, name, timestamp) {
+    if (els.emptyState) {
+      els.emptyState.style.display = 'none';
+    }
+
+    const url = trackedObjectUrl(blob);
+    const time = new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const item = document.createElement('div');
+    item.className = 'clip-item video-item new';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'video-wrapper';
+
+    // Untrusted content: only ever used as a media source or a download, never
+    // injected into the DOM as markup.
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.className = 'received-video';
+    wrapper.appendChild(video);
+
+    const meta = document.createElement('div');
+    meta.className = 'clip-meta';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'clip-time';
+    timeSpan.textContent = `${time} · ${formatBytes(blob.size)}`;
+
+    const dlBtn = document.createElement('a');
+    dlBtn.className = 'btn-download-img';
+    dlBtn.href = url;
+    dlBtn.download = name || `clippy-video-${timestamp}.mp4`;
+    dlBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+      Download
+    `;
+
+    meta.appendChild(timeSpan);
+    meta.appendChild(dlBtn);
+    item.appendChild(wrapper);
+    item.appendChild(meta);
+
+    els.clipFeed.insertBefore(item, els.clipFeed.firstChild);
+    setTimeout(() => item.classList.remove('new'), 2000);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  /**
+   * Show or update the transfer progress bar.
+   */
+  function showTransferProgress(label, ratio) {
+    if (!els.transferProgress) return;
+    els.transferProgress.classList.add('visible');
+    els.transferLabel.textContent = label;
+    const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+    els.transferBar.style.width = `${pct}%`;
+    els.transferPct.textContent = `${pct}%`;
+  }
+
+  function hideTransferProgress() {
+    if (!els.transferProgress) return;
+    els.transferProgress.classList.remove('visible');
+    els.transferBar.style.width = '0%';
+  }
+
   /**
    * Clear the clip feed.
    */
   function clearFeed() {
+    revokeObjectUrls();
     els.clipFeed.innerHTML = '';
     els.clipFeed.appendChild(els.emptyState || createEmptyState());
     if (els.emptyState) els.emptyState.style.display = '';
@@ -336,6 +440,10 @@ const UI = (() => {
     updateTTL,
     addClipToFeed,
     addImageToFeed,
+    addVideoToFeed,
+    showTransferProgress,
+    hideTransferProgress,
+    revokeObjectUrls,
     clearFeed,
     copyToClipboard,
     showToast,

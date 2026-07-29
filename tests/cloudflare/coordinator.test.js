@@ -59,12 +59,16 @@ function createMockEnv(overrides = {}) {
 class MockWebSocket {
   constructor() {
     this.messages = [];
+    this.binary = [];
     this.closed = false;
     this.closeCode = null;
     this.closeReason = null;
     this._listeners = {};
   }
-  send(raw) { this.messages.push(JSON.parse(raw)); }
+  send(raw) {
+    if (typeof raw === 'string') this.messages.push(JSON.parse(raw));
+    else this.binary.push(raw);
+  }
   close(code, reason) { this.closed = true; this.closeCode = code; this.closeReason = reason; }
   accept() {}
   addEventListener(event, fn) { this._listeners[event] = fn; }
@@ -690,6 +694,203 @@ describe('ClippyCoordinator — invalid messages', () => {
 
     const err = s1.find('error');
     expect(err?.message).toMatch(/invalid code/i);
+  });
+});
+
+// ─── Chunked transfers (RF-15) ───────────────────────────────────────────────
+
+const TRANSFER_ID = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
+function chunkFrame(transferId, index, payloadBytes) {
+  const buf = new Uint8Array(21 + payloadBytes.length);
+  buf[0] = 1;
+  for (let i = 0; i < 16; i += 1) {
+    buf[1 + i] = parseInt(transferId.substr(i * 2, 2), 16);
+  }
+  new DataView(buf.buffer).setUint32(17, index, false);
+  buf.set(payloadBytes, 21);
+  return buf.buffer;
+}
+
+/** Open a session with two devices and return both sockets. */
+async function pairedSession(coord, envOverrides) {
+  const { server: s1 } = await openSocket(coord, '1.1.1.1');
+  await sendMsg(coord, s1, { type: 'create_session' });
+  const { code } = s1.find('session_created');
+  const { server: s2 } = await openSocket(coord, '2.2.2.2');
+  await sendMsg(coord, s2, { type: 'join_session', code });
+  s1.messages = [];
+  s2.messages = [];
+  return { s1, s2, code };
+}
+
+function startMsg(overrides = {}) {
+  return {
+    type: 'transfer_start',
+    transferId: TRANSFER_ID,
+    name: 'clip.mp4',
+    mimeType: 'video/mp4',
+    size: 1000,
+    chunkSize: 500,
+    chunkCount: 2,
+    ...overrides,
+  };
+}
+
+describe('ClippyCoordinator — chunked transfers (RF-15)', () => {
+  it('announces an incoming transfer to the peer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg());
+
+    const incoming = s1.find('transfer_incoming');
+    expect(incoming).toBeDefined();
+    expect(incoming.transferId).toBe(TRANSFER_ID);
+    expect(incoming.mimeType).toBe('video/mp4');
+    expect(incoming.chunkCount).toBe(2);
+  });
+
+  it('relays chunk frames to the peer byte-for-byte', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+
+    const payload = new Uint8Array([9, 8, 7, 6, 5]);
+    const frame = chunkFrame(TRANSFER_ID, 0, payload);
+    await coord.webSocketMessage(s2, frame);
+
+    const relayed = s1.binary[s1.binary.length - 1];
+    expect(relayed).toBeDefined();
+    expect(new Uint8Array(relayed)).toEqual(new Uint8Array(frame));
+  });
+
+  it('never writes transfer payload to Durable Object storage', async () => {
+    const { coord, storage } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 4096, chunkSize: 1024, chunkCount: 4 }));
+
+    const putsBefore = storage.put.mock.calls.length;
+    for (let i = 0; i < 4; i += 1) {
+      await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, i, new Uint8Array(1024)));
+    }
+
+    expect(storage.put.mock.calls.length).toBe(putsBefore);
+  });
+
+  it('signals completion once every declared byte has been relayed', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 20, chunkSize: 10, chunkCount: 2 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 1, new Uint8Array(10)));
+    await sendMsg(coord, s2, { type: 'transfer_end', transferId: TRANSFER_ID });
+
+    expect(s1.find('transfer_complete')).toBeDefined();
+  });
+
+  it('reports an abort when the transfer ends short of its declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 20, chunkSize: 10, chunkCount: 2 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+    await sendMsg(coord, s2, { type: 'transfer_end', transferId: TRANSFER_ID });
+
+    expect(s1.find('transfer_complete')).toBeUndefined();
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/ended early/i);
+  });
+
+  it('aborts a sender that overruns its declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg({ size: 10, chunkSize: 10, chunkCount: 1 }));
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(999)));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/exceeded declared size/i);
+    expect(s1.binary).toHaveLength(0);
+  });
+
+  it('rejects a video above the size limit', async () => {
+    const { coord } = await newCoordinator(undefined, { VIDEO_MAX_BYTES: '1000' });
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ size: 5000, chunkSize: 1000, chunkCount: 5 }));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/exceeds/i);
+  });
+
+  it('rejects an unsupported container', async () => {
+    const { coord } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ mimeType: 'application/zip' }));
+
+    expect(s2.find('transfer_aborted')?.reason).toMatch(/unsupported format/i);
+  });
+
+  it('rejects framing that does not match the declared size', async () => {
+    const { coord } = await newCoordinator();
+    const { s2 } = await pairedSession(coord);
+
+    await sendMsg(coord, s2, startMsg({ size: 1000, chunkSize: 100, chunkCount: 3 }));
+
+    expect(s2.find('error')?.message).toMatch(/invalid transfer framing/i);
+  });
+
+  it('ignores chunks for a transfer that was never started', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+
+    await coord.webSocketMessage(s2, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+
+    expect(s1.binary).toHaveLength(0);
+  });
+
+  it('does not let one socket push chunks onto another socket\'s transfer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+    s1.binary.length = 0;
+
+    // s1 is the receiver, not the owner of TRANSFER_ID.
+    await coord.webSocketMessage(s1, chunkFrame(TRANSFER_ID, 0, new Uint8Array(10)));
+
+    expect(s2.binary).toHaveLength(0);
+  });
+
+  it('refuses to start a transfer with no peers to receive it', async () => {
+    const { coord } = await newCoordinator();
+    const { server: s1 } = await openSocket(coord, '1.1.1.1');
+    await sendMsg(coord, s1, { type: 'create_session' });
+
+    await sendMsg(coord, s1, startMsg());
+
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/no connected peers/i);
+  });
+
+  it('tells the peer when the sender disconnects mid-transfer', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+
+    await closeSocket(coord, s2);
+
+    expect(s1.find('transfer_aborted')?.reason).toMatch(/sender disconnected/i);
+  });
+
+  it('routes receiver acks back to the sender only', async () => {
+    const { coord } = await newCoordinator();
+    const { s1, s2 } = await pairedSession(coord);
+    await sendMsg(coord, s2, startMsg());
+    s1.messages = [];
+
+    await sendMsg(coord, s1, { type: 'transfer_ack', transferId: TRANSFER_ID, upTo: 1 });
+
+    expect(s2.find('transfer_ack')?.upTo).toBe(1);
+    expect(s1.find('transfer_ack')).toBeUndefined();
   });
 });
 

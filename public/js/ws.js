@@ -61,6 +61,7 @@ const WS = (() => {
 
     try {
       socket = new WebSocket(url);
+      socket.binaryType = 'arraybuffer'; // transfer chunks arrive as raw frames
     } catch (err) {
       console.error('[WS] Connection error:', err);
       emit('connection_error', { message: err.message });
@@ -82,6 +83,12 @@ const WS = (() => {
     socket.onmessage = (event) => {
       // Keepalive reply from setWebSocketAutoResponse — plain text, not JSON.
       if (event.data === 'pong') return;
+
+      // Transfer chunks are binary frames, not JSON.
+      if (event.data instanceof ArrayBuffer) {
+        emit('binary_chunk', event.data);
+        return;
+      }
 
       try {
         const data = JSON.parse(event.data);
@@ -156,6 +163,28 @@ const WS = (() => {
       console.error('[WS] Send error:', err);
       return false;
     }
+  }
+
+  /**
+   * Send a raw binary frame (a transfer chunk).
+   */
+  function sendBinary(buffer) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    try {
+      socket.send(buffer);
+      return true;
+    } catch (err) {
+      console.error('[WS] Binary send error:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Bytes queued but not yet handed to the network. The sender watches this so
+   * it does not outrun the socket and grow an unbounded outbound buffer.
+   */
+  function bufferedAmount() {
+    return socket ? socket.bufferedAmount : 0;
   }
 
   /**
@@ -274,6 +303,8 @@ const WS = (() => {
   return {
     connect,
     send,
+    sendBinary,
+    bufferedAmount,
     disconnect,
     getCode,
     on,

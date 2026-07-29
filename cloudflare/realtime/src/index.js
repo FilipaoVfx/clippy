@@ -5,6 +5,7 @@ const DEFAULTS = {
   deviceDisconnectTtlMs: 60000,
   maxMessageSize: 10240,
   imageMaxBytes: 5 * 1024 * 1024,
+  videoMaxBytes: 50 * 1024 * 1024,
   rateLimitMax: 30,
   rateLimitWindowMs: 60000,
   // Byte budget per window, refilled continuously. Bounds how fast a single
@@ -15,6 +16,27 @@ const DEFAULTS = {
 };
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+
+// Binary chunk framing (RF-15). The coordinator never parses the payload — it
+// only reads this header to attribute the chunk, then relays the frame as-is.
+//   byte  0      version
+//   bytes 1..16  transferId
+//   bytes 17..20 chunkIndex (uint32 big-endian)
+//   bytes 21..   payload
+const TRANSFER_FRAME_VERSION = 1;
+const TRANSFER_HEADER_BYTES = 21;
+const TRANSFER_ID_BYTES = 16;
+const MAX_CHUNK_BYTES = 1024 * 1024;
+const TRANSFER_FLOW_TYPES = new Set(["transfer_ack", "transfer_ready"]);
+
+function hexFromBytes(bytes) {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    out += bytes[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const CODE_DIGITS = "0123456789";
@@ -153,6 +175,7 @@ export class ClippyCoordinator extends DurableObject {
       deviceDisconnectTtlMs: readNumber(env, "DEVICE_DISCONNECT_TTL_MS", DEFAULTS.deviceDisconnectTtlMs),
       maxMessageSize: readNumber(env, "MAX_MESSAGE_SIZE", DEFAULTS.maxMessageSize),
       imageMaxBytes: readNumber(env, "IMAGE_MAX_BYTES", DEFAULTS.imageMaxBytes),
+      videoMaxBytes: readNumber(env, "VIDEO_MAX_BYTES", DEFAULTS.videoMaxBytes),
       rateLimitMax: readNumber(env, "RATE_LIMIT_MAX", DEFAULTS.rateLimitMax),
       rateLimitWindowMs: readNumber(env, "RATE_LIMIT_WINDOW_MS", DEFAULTS.rateLimitWindowMs),
       rateLimitBytes: readNumber(env, "RATE_LIMIT_BYTES", DEFAULTS.rateLimitBytes),
@@ -165,6 +188,10 @@ export class ClippyCoordinator extends DurableObject {
     // bucket refills anyway.
     this.runtime = {
       rateLimits: new Map(),
+      // In-flight transfers. Deliberately NOT in stateData: stateData is what
+      // gets written to ctx.storage, and persisting transfer bookkeeping would
+      // break the zero-storage guarantee (RNF-08).
+      transfers: new Map(),
     };
     this.stateData = createState();
 
@@ -361,18 +388,35 @@ export class ClippyCoordinator extends DurableObject {
 
   async handleSocketMessage(socketId, raw) {
     const isBinary = typeof raw !== "string";
-    const byteCost = isBinary ? (raw.byteLength || 0) : new TextEncoder().encode(raw).length;
+    const byteCost = isBinary ? raw.byteLength || 0 : new TextEncoder().encode(raw).length;
 
-    if (!this.checkRateLimit(this.ipOfSocket(socketId), { byteCost })) {
+    const ip = this.ipOfSocket(socketId);
+
+    // The byte lane always applies: it is what actually bounds throughput.
+    if (!this.checkRateLimit(ip, { msgCost: 0, byteCost })) {
       this.sendById(socketId, { type: "error", message: "Rate limit exceeded. Please slow down." });
+      return;
+    }
+
+    if (isBinary) {
+      this.handleTransferChunk(socketId, raw);
       return;
     }
 
     let data;
     try {
-      data = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw));
+      data = JSON.parse(raw);
     } catch {
       this.sendById(socketId, { type: "error", message: "Invalid message format" });
+      return;
+    }
+
+    // The message lane guards the control plane against floods. Transfer
+    // flow-control is exempt: one ack per chunk is inherent to the protocol and
+    // its count is already bounded by the byte lane, so charging it here would
+    // stall any transfer longer than the message allowance.
+    if (!TRANSFER_FLOW_TYPES.has(data.type) && !this.checkRateLimit(ip, { msgCost: 1 })) {
+      this.sendById(socketId, { type: "error", message: "Rate limit exceeded. Please slow down." });
       return;
     }
 
@@ -391,6 +435,19 @@ export class ClippyCoordinator extends DurableObject {
         break;
       case "send_image":
         await this.handleSendImage(socketId, data);
+        break;
+      case "transfer_start":
+        this.handleTransferStart(socketId, data);
+        break;
+      case "transfer_ready":
+      case "transfer_ack":
+        this.relayToTransferSender(socketId, data);
+        break;
+      case "transfer_end":
+        this.handleTransferEnd(socketId, data);
+        break;
+      case "transfer_abort":
+        this.handleTransferAbort(socketId, data);
         break;
       case "leave_session":
         await this.handleLeaveSession(socketId);
@@ -672,6 +729,192 @@ export class ClippyCoordinator extends DurableObject {
     this.sendById(socketId, { type: "image_sent", timestamp });
   }
 
+  // ── Chunked transfers (RF-15) ─────────────────────────────────────────────
+  // Payload bytes are relayed verbatim and never stored, buffered or parsed.
+  // Only the small header is read, to attribute a chunk to a transfer.
+
+  handleTransferStart(socketId, data) {
+    const code = this.codeOfSocket(socketId);
+    if (!code) {
+      this.sendById(socketId, { type: "error", message: "Not in a session" });
+      return;
+    }
+
+    const transferId = String(data.transferId || "");
+    if (!/^[a-f0-9]{32}$/.test(transferId)) {
+      this.sendById(socketId, { type: "error", message: "Invalid transfer id" });
+      return;
+    }
+
+    const mimeType = String(data.mimeType || "");
+    if (!ALLOWED_VIDEO_TYPES.has(mimeType)) {
+      this.sendById(socketId, {
+        type: "transfer_aborted",
+        transferId,
+        reason: "Unsupported format. Use MP4, WEBM or MOV.",
+      });
+      return;
+    }
+
+    const size = Number(data.size);
+    const chunkSize = Number(data.chunkSize);
+    const chunkCount = Number(data.chunkCount);
+
+    if (!Number.isFinite(size) || size <= 0 || size > this.config.videoMaxBytes) {
+      this.sendById(socketId, {
+        type: "transfer_aborted",
+        transferId,
+        reason: `Video exceeds ${Math.floor(this.config.videoMaxBytes / (1024 * 1024))} MB limit`,
+      });
+      return;
+    }
+
+    if (
+      !Number.isFinite(chunkSize) || chunkSize <= 0 || chunkSize > MAX_CHUNK_BYTES ||
+      !Number.isFinite(chunkCount) || chunkCount !== Math.ceil(size / chunkSize)
+    ) {
+      this.sendById(socketId, { type: "error", message: "Invalid transfer framing" });
+      return;
+    }
+
+    // One transfer per sender at a time keeps memory and bookkeeping bounded.
+    for (const [id, transfer] of this.runtime.transfers) {
+      if (transfer.socketId === socketId) {
+        this.runtime.transfers.delete(id);
+      }
+    }
+
+    const peers = this.getPeerSocketIds(code, socketId);
+    if (peers.length === 0) {
+      this.sendById(socketId, {
+        type: "transfer_aborted",
+        transferId,
+        reason: "No connected peers",
+      });
+      return;
+    }
+
+    this.runtime.transfers.set(transferId, {
+      socketId,
+      code,
+      size,
+      chunkSize,
+      chunkCount,
+      bytesSeen: 0,
+    });
+
+    for (const peerSocketId of peers) {
+      this.sendById(peerSocketId, {
+        type: "transfer_incoming",
+        transferId,
+        name: typeof data.name === "string" ? sanitizeText(data.name).slice(0, 200) : "video",
+        mimeType,
+        size,
+        chunkSize,
+        chunkCount,
+      });
+    }
+  }
+
+  handleTransferChunk(socketId, raw) {
+    const bytes = new Uint8Array(raw);
+    if (bytes.byteLength <= TRANSFER_HEADER_BYTES || bytes[0] !== TRANSFER_FRAME_VERSION) {
+      return;
+    }
+
+    const transferId = hexFromBytes(bytes.subarray(1, 1 + TRANSFER_ID_BYTES));
+    const transfer = this.runtime.transfers.get(transferId);
+
+    // Unknown transfer, or a socket relaying someone else's id.
+    if (!transfer || transfer.socketId !== socketId) {
+      return;
+    }
+
+    const payloadBytes = bytes.byteLength - TRANSFER_HEADER_BYTES;
+    transfer.bytesSeen += payloadBytes;
+
+    if (transfer.bytesSeen > transfer.size) {
+      this.runtime.transfers.delete(transferId);
+      this.abortTransfer(transferId, transfer, "Transfer exceeded declared size");
+      return;
+    }
+
+    for (const peerSocketId of this.getPeerSocketIds(transfer.code, socketId)) {
+      this.sendRawById(peerSocketId, raw);
+    }
+  }
+
+  handleTransferEnd(socketId, data) {
+    const transferId = String(data.transferId || "");
+    const transfer = this.runtime.transfers.get(transferId);
+    if (!transfer || transfer.socketId !== socketId) {
+      return;
+    }
+
+    this.runtime.transfers.delete(transferId);
+
+    const complete = transfer.bytesSeen === transfer.size;
+    const payload = complete
+      ? { type: "transfer_complete", transferId }
+      : { type: "transfer_aborted", transferId, reason: "Transfer ended early" };
+
+    for (const peerSocketId of this.getPeerSocketIds(transfer.code, socketId)) {
+      this.sendById(peerSocketId, payload);
+    }
+    // The sender needs the same verdict to clear its progress UI.
+    this.sendById(socketId, payload);
+  }
+
+  handleTransferAbort(socketId, data) {
+    const transferId = String(data.transferId || "");
+    const transfer = this.runtime.transfers.get(transferId);
+    if (!transfer) {
+      return;
+    }
+
+    // Either end may abort: the sender gives up, or the receiver rejects it.
+    const code = this.codeOfSocket(socketId);
+    if (transfer.socketId !== socketId && transfer.code !== code) {
+      return;
+    }
+
+    this.runtime.transfers.delete(transferId);
+    this.abortTransfer(transferId, transfer, String(data.reason || "Transfer cancelled"), socketId);
+  }
+
+  abortTransfer(transferId, transfer, reason, excludeSocketId) {
+    const payload = { type: "transfer_aborted", transferId, reason };
+
+    for (const peerSocketId of this.getPeerSocketIds(transfer.code, excludeSocketId)) {
+      this.sendById(peerSocketId, payload);
+    }
+    if (excludeSocketId !== transfer.socketId) {
+      this.sendById(transfer.socketId, payload);
+    }
+  }
+
+  /** Route receiver-side control messages (ready/ack) back to the sender. */
+  relayToTransferSender(socketId, data) {
+    const transfer = this.runtime.transfers.get(String(data.transferId || ""));
+    if (!transfer) {
+      return;
+    }
+    if (transfer.code !== this.codeOfSocket(socketId)) {
+      return;
+    }
+    this.sendById(transfer.socketId, data);
+  }
+
+  /** Drop any transfers owned by a socket that went away. */
+  cancelTransfersFor(socketId) {
+    for (const [transferId, transfer] of this.runtime.transfers) {
+      if (transfer.socketId === socketId) {
+        this.runtime.transfers.delete(transferId);
+        this.abortTransfer(transferId, transfer, "Sender disconnected", socketId);
+      }
+    }
+  }
+
   async handleLeaveSession(socketId) {
     const code = this.codeOfSocket(socketId);
     this.setSocketCode(socketId, null);
@@ -713,6 +956,8 @@ export class ClippyCoordinator extends DurableObject {
   async handleDisconnect(socketId, code) {
     // Rate-limit buckets are keyed by IP and deliberately outlive the socket:
     // clearing them here would let a client reset its budget by reconnecting.
+    this.cancelTransfersFor(socketId);
+
     if (!code) {
       return;
     }
@@ -908,6 +1153,19 @@ export class ClippyCoordinator extends DurableObject {
       socket.send(JSON.stringify(payload));
     } catch (error) {
       console.error("[Clippy DO] Send error:", error);
+    }
+  }
+
+  /** Forward a binary frame untouched — no copy, no parse, no buffering. */
+  sendRawById(socketId, buffer) {
+    const socket = this.socketById(socketId);
+    if (!socket) {
+      return;
+    }
+    try {
+      socket.send(buffer);
+    } catch (error) {
+      console.error("[Clippy DO] Raw send error:", error);
     }
   }
 

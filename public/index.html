@@ -175,6 +175,35 @@
         </div>
       </div>
 
+      <!-- Send Video (RF-15) -->
+      <div class="clip-section send-video-section">
+        <label class="section-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+          Send Video
+        </label>
+        <div class="image-drop-zone" id="video-drop-zone">
+          <input type="file" id="input-video" accept="video/mp4,video/webm,video/quicktime" class="hidden-file-input" aria-label="Select video">
+          <div class="drop-zone-inner">
+            <span class="drop-zone-icon">🎬</span>
+            <p class="drop-zone-text">Drop a video here</p>
+            <button class="btn-send-image" id="btn-send-video" type="button">Browse file</button>
+          </div>
+          <p class="image-limits">MP4 · WEBM · MOV &nbsp;·&nbsp; max 50 MB</p>
+        </div>
+        <div class="transfer-progress" id="transfer-progress">
+          <div class="transfer-progress-head">
+            <span id="transfer-label">Sending</span>
+            <span id="transfer-pct">0%</span>
+          </div>
+          <div class="transfer-track">
+            <div class="transfer-bar" id="transfer-bar"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Received -->
       <div class="clip-section receive-section">
         <label class="section-label">
