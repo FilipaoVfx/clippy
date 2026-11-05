@@ -47,6 +47,7 @@ const UI = (() => {
    * Switch to a view (home, waiting, connected).
    */
   function showView(viewName) {
+    document.body.dataset.view = viewName;
     const views = [els.viewHome, els.viewWaiting, els.viewConnected];
     views.forEach(v => v.classList.remove('active'));
 
@@ -362,9 +363,9 @@ const UI = (() => {
     div.className = 'empty-state';
     div.id = 'empty-state';
     div.innerHTML = `
-      <span class="empty-icon">📭</span>
-      <p>No clips received yet</p>
-      <p class="empty-hint">Text sent from the other device will appear here</p>
+      <svg class="empty-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 14h5l2 3h2l2-3h5M12 6v6m-3-3 3 3 3-3"/></svg>
+      <p>Nothing here. Yet.</p>
+      <p class="empty-hint">Your shared text, images and videos will land here.</p>
     `;
     els.emptyState = div;
     return div;
@@ -405,12 +406,21 @@ const UI = (() => {
     toast.className = `toast ${type}`;
 
     const icons = {
-      success: '✓',
-      error: '✕',
-      info: 'ℹ',
+      success: '<path d="m5 12 4 4L19 6"/>',
+      error: '<path d="m6 6 12 12M6 18 18 6"/>',
+      info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
     };
 
-    toast.innerHTML = `<span>${icons[type] || 'ℹ'}</span> ${escapeHtml(message)}`;
+    toast.innerHTML = `<svg aria-hidden="true" viewBox="0 0 24 24">${icons[type] || icons.info}</svg> ${escapeHtml(message)}`;
+    toast.dataset.message = message;
+    // A burst of connection/transfer events must not obscure the working area.
+    for (const existing of els.toastContainer.children) {
+      if (existing.dataset.message === message) existing.remove();
+    }
+    const visibleLimit = window.matchMedia('(max-width: 760px)').matches ? 1 : 2;
+    while (els.toastContainer.children.length >= visibleLimit) {
+      els.toastContainer.firstElementChild.remove();
+    }
     els.toastContainer.appendChild(toast);
 
     setTimeout(() => {

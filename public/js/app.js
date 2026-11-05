@@ -125,7 +125,7 @@
   async function maybeSuggestApp() {
     if (isStandalone()) return; // already running as the app
     if (await isAppInstalled()) {
-      UI.showToast('You have Clippy installed — open it for the full app.', 'info', 5000);
+      UI.showToast('You have Pastty installed — open it for the full app.', 'info', 5000);
     }
   }
 

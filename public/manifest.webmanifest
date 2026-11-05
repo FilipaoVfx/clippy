@@ -1,6 +1,6 @@
 {
-  "name": "Clippy — Clipboard Sync",
-  "short_name": "Clippy",
+  "name": "Pastty — Clipboard Sync",
+  "short_name": "Pastty",
   "description": "Share text and images between devices in real-time. No login, no apps.",
   "id": "/",
   "start_url": "/?source=pwa",
@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#0a0e1a",
-  "theme_color": "#0a0e1a",
+  "background_color": "#f4ece5",
+  "theme_color": "#f4ece5",
   "categories": ["productivity", "utilities"],
   "launch_handler": {
     "client_mode": "navigate-existing"

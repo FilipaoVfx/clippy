@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Clippy — Share text and images between devices in real-time. No login, no apps. Just a code and instant sync.">
-  <meta name="theme-color" content="#0a0e1a">
-  <title>Clippy — Clipboard Sync</title>
+  <meta name="description" content="Pastty — Share text and images between devices in real-time. No login, no apps. Just a code and instant sync.">
+  <meta name="theme-color" content="#f4ece5">
+  <title>Pastty — Clipboard Sync</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest">
@@ -14,78 +14,61 @@
   <link rel="apple-touch-icon" href="/icon-192.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Clippy">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Pastty">
 
-  <!-- Fonts loaded without blocking first paint -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-
+  <link rel="preload" href="/fonts/russo-one-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/fonts/manrope-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/assets/pastty-devices.webp" as="image" media="(min-width: 761px)">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Background animated gradient -->
-  <div class="bg-gradient"></div>
-  <div class="bg-noise"></div>
-
-  <!-- Connection Status Bar -->
-  <div class="status-bar" id="status-bar">
-    <div class="status-dot" id="status-dot"></div>
-    <span class="status-text" id="status-text">Connecting...</span>
-  </div>
-
+  <a class="skip-link" href="#main">Skip to connection</a>
+  <div class="device-scene" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Pastty home"><img src="/icon.svg" alt="" width="48" height="48"><span>Pastty<span class="brand-period">.</span></span></a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="nav-current" href="#main"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v11h5v-6h4v6h5V9"/></svg>Connect</a>
+      <button type="button" id="btn-help" aria-controls="how-it-works" aria-expanded="false">How it works</button>
+    </nav>
+    <div class="header-tools">
+      <div class="status-bar" id="status-bar" role="status"><div class="status-dot" id="status-dot"></div><span class="status-text" id="status-text">Ready to pair</span></div>
+      <button class="theme-toggle" id="btn-theme" type="button" aria-label="Use dark theme" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+    </div>
+  </header>
   <!-- Main Application -->
-  <main class="app-container">
+  <main class="app-container" id="main" tabindex="-1">
 
     <!-- ==================== VIEW: HOME ==================== -->
     <section class="view active" id="view-home">
       <div class="hero">
-        <div class="logo">
-          <span class="logo-icon">📋</span>
-          <h1>Clippy</h1>
-        </div>
-        <p class="tagline">Copy here → Paste there. <span class="accent">Instantly.</span></p>
-        <p class="subtitle">Share text between devices in real-time. No login, no apps.</p>
+        <h1>Pastty<span class="hero-period">.</span></h1>
+        <p class="tagline">Copy. Share. <span>Sync.</span></p>
+        <p class="subtitle">A little connection. Everything across devices.</p>
       </div>
-
-      <div class="action-cards">
-        <div class="glass-card card-create" id="btn-create">
-          <div class="card-icon">🚀</div>
-          <h2>Start Session</h2>
-          <p>Generate a code and share it with your other device</p>
-          <div class="card-arrow">→</div>
+      <div class="pairing-panel">
+        <div class="pairing-action">
+          <div class="action-symbol action-symbol-dark"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7z"/></svg></div>
+          <h2>Start a session</h2>
+          <p>Create a room and get your<br class="desktop-break"> unique code.</p>
+          <button class="btn-primary btn-create" id="btn-create" type="button">Create room <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
         </div>
-
-        <div class="divider-or">
-          <span>or</span>
-        </div>
-
-        <div class="glass-card card-join">
-          <div class="card-icon">🔗</div>
-          <h2>Join Session</h2>
-          <p>Enter the code from your other device</p>
+        <span class="divider-or" aria-hidden="true">or</span>
+        <div class="pairing-action">
+          <div class="action-symbol"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10 13 4-4m-6 7-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 1 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 1)"/></svg></div>
+          <h2>Join a session</h2>
+          <p>Enter a code to connect<br class="desktop-break"> with your other device.</p>
           <div class="join-input-group">
-            <input
-              type="text"
-              id="input-code"
-              class="code-input"
-              placeholder="ABC-12K"
-              maxlength="7"
-              autocomplete="off"
-              spellcheck="false"
-            >
-            <button class="btn-join" id="btn-join" disabled>
-              <span>Join</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </button>
+            <input type="text" id="input-code" class="code-input" placeholder="ABC-12K" maxlength="7" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Session code">
+            <button class="btn-join" id="btn-join" type="button" disabled aria-label="Join session"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
           </div>
         </div>
       </div>
+      <ul class="feature-strip" aria-label="Session features">
+        <li><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-12h-8z"/></svg>Real-time</li>
+        <li><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>No account</li>
+        <li><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12c-6-10-15 6-7 6 5 0 9-12 14-12 8 0-1 16-7 6Z"/></svg>Ephemeral</li>
+      </ul>
     </section>
 
     <!-- ==================== VIEW: WAITING ==================== -->
@@ -94,10 +77,10 @@
         <div class="pulse-ring">
           <div class="pulse-dot"></div>
         </div>
-        <h2>Your Session Code</h2>
+        <h1>Your other device, one code away<span class="brand-period">.</span></h1><p class="waiting-intro">Scan the QR or enter this code to make the connection.</p>
         <div class="code-display" id="display-code">
           <span class="code-text" id="code-text">---</span>
-          <button class="btn-copy-code" id="btn-copy-code" title="Copy code">
+          <button class="btn-copy-code" id="btn-copy-code" title="Copy code" aria-label="Copy session code">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
               <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
@@ -128,25 +111,27 @@
         <div class="session-info">
           <span class="session-code" id="connected-code">---</span>
         </div>
-        <button class="btn-disconnect" id="btn-disconnect" title="Disconnect">
+        <button class="btn-disconnect" id="btn-disconnect" title="Disconnect" aria-label="Disconnect session">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
         </button>
       </div>
 
+      <div class="session-heading"><h1>You’re connected<span class="brand-period">.</span></h1><p>A thought, a photo, a video. Send it across.</p></div>
+
       <!-- Send Text -->
       <div class="clip-section send-section">
-        <label class="section-label">
+        <div class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
           </svg>
           Send Text
-        </label>
+        </div>
         <div class="send-group">
           <textarea
             id="input-clip"
-            class="clip-textarea"
+            class="clip-textarea" aria-label="Text to share"
             placeholder="Paste or type text here..."
             rows="3"
           ></textarea>
@@ -161,18 +146,18 @@
 
       <!-- Send Image (RF-13) -->
       <div class="clip-section send-image-section">
-        <label class="section-label">
+        <div class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
             <circle cx="8.5" cy="8.5" r="1.5"/>
             <path d="M21 15l-5-5L5 21"/>
           </svg>
           Send Image
-        </label>
+        </div>
         <div class="image-drop-zone" id="image-drop-zone">
           <input type="file" id="input-image" accept="image/png,image/jpeg,image/webp" class="hidden-file-input" aria-label="Select image">
           <div class="drop-zone-inner">
-            <span class="drop-zone-icon">🖼️</span>
+            <svg class="drop-zone-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 5-5 4 3 4-7 4 6"/></svg>
             <p class="drop-zone-text">Drop image here or paste from clipboard</p>
             <button class="btn-send-image" id="btn-send-image" type="button">Browse file</button>
           </div>
@@ -182,17 +167,17 @@
 
       <!-- Send Video (RF-15) -->
       <div class="clip-section send-video-section">
-        <label class="section-label">
+        <div class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="23 7 16 12 23 17 23 7"/>
             <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
           </svg>
           Send Video
-        </label>
+        </div>
         <div class="image-drop-zone" id="video-drop-zone">
           <input type="file" id="input-video" accept="video/mp4,video/webm,video/quicktime" class="hidden-file-input" aria-label="Select video">
           <div class="drop-zone-inner">
-            <span class="drop-zone-icon">🎬</span>
+            <svg class="drop-zone-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="14" rx="3"/><path d="m16 10 6-4v12l-6-4"/></svg>
             <p class="drop-zone-text">Drop a video here</p>
             <button class="btn-send-image" id="btn-send-video" type="button">Browse file</button>
           </div>
@@ -211,27 +196,34 @@
 
       <!-- Received -->
       <div class="clip-section receive-section">
-        <label class="section-label">
+        <div class="section-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
           </svg>
           Received
-        </label>
+        </div>
         <div class="clip-feed" id="clip-feed">
           <div class="empty-state" id="empty-state">
-            <span class="empty-icon">📭</span>
-            <p>No content received yet</p>
-            <p class="empty-hint">Text and images from the other device appear here</p>
+            <svg class="empty-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 14h5l2 3h2l2-3h5M12 6v6m-3-3 3 3 3-3"/></svg>
+            <p>Nothing here. Yet.</p>
+            <p class="empty-hint">Your shared text, images and videos will land here.</p>
           </div>
         </div>
       </div>
     </section>
 
+    <section class="how-it-works" id="how-it-works" hidden aria-labelledby="help-title">
+      <h2 id="help-title">Two devices. One little room.</h2>
+      <ol><li><strong>Create a room.</strong> Your first device gets a short code and a QR.</li><li><strong>Make the connection.</strong> Open this same address on your other device and scan or enter the code.</li><li><strong>Send it across.</strong> Share text, images up to 5 MB, or videos up to 50 MB with up to five devices.</li></ol>
+      <p>Rooms last five minutes; joining or reconnecting renews the timer. Content is relayed over your connection; it isn’t saved as message history. Anyone with your code can join, so share it with people you trust.</p>
+    </section>
   </main>
+  <footer class="site-footer">Less sending to yourself. More getting on with it.</footer>
 
   <!-- Toast Notifications -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
 
+  <script defer src="js/design.js"></script>
   <script defer src="js/qr.js"></script>
   <script defer src="js/ws.js"></script>
   <script defer src="js/ui.js"></script>
