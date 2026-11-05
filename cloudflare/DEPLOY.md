@@ -1,5 +1,32 @@
 # Desplegar Clippy en Cloudflare Workers
 
+## Configuración actual de pastty.com
+
+El repositorio también está conectado al proyecto **Cloudflare Pages `clippy`**,
+que sirve la interfaz en `pastty.com`. El Worker `clippy-realtime` sigue siendo
+necesario para el backend: Pages estático no implementa WebSockets ni crea el
+Durable Object. Si se elimina ese Worker, vuelve a ejecutar **Deploy Cloudflare**
+en GitHub Actions para recrearlo con su binding y migración.
+
+El archivo raíz `wrangler.toml` configura las rutas `pastty.com/ws*` y
+`pastty.com/health*` sobre la zona `pastty.com`. Estas rutas envían las peticiones
+de API al Worker sobre el DNS proxied existente del dominio. El token de despliegue
+necesita **Zone: Workers Routes (Edit)** y acceso de lectura a esa zona, además de
+los permisos de Workers de la cuenta. No requiere eliminar el dominio de Pages.
+
+GitHub Actions publica el backend y comprueba el dominio con:
+
+```bash
+npm run cf:verify -- https://pastty.com
+```
+
+La comprobación exige JSON de salud, estado 426 para HTTP normal en `/ws`, y un
+upgrade WebSocket con respuesta `pong`. No crea sesiones ni envía contenido.
+Si `/health` devuelve HTML, el dominio está sirviendo Pages sin enrutar el backend.
+
+Las opciones siguientes describen también el despliegue autónomo del Worker
+completo, que puede servir frontend y backend desde su URL `workers.dev`.
+
 Usa **Workers**, con el nombre **`clippy-realtime`**. Un solo despliegue incluye
 la PWA, los archivos estáticos, `/health`, `/ws` y el Durable Object.
 No hace falta crear Pages, una base D1, KV, R2, ni configurar una URL de backend.

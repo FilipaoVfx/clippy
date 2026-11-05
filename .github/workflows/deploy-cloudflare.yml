@@ -42,3 +42,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run deploy
+
+      - name: Verify public backend and WebSocket routing
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: npm run cf:verify -- https://pastty.com
