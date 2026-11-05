@@ -4,16 +4,6 @@ main = "cloudflare/worker.js"
 compatibility_date = "2026-04-09"
 workers_dev = true
 
-# The domain's frontend is connected to Pages. API traffic must reach this
-# Worker even when Pages serves index.html for unknown paths.
-[[routes]]
-pattern = "pastty.com/ws*"
-zone_name = "pastty.com"
-
-[[routes]]
-pattern = "pastty.com/health*"
-zone_name = "pastty.com"
-
 [build]
 command = "npm run build"
 
