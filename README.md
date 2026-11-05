@@ -1,7 +1,7 @@
 # Clippy
 
 **Real-time clipboard sync between devices via ephemeral pairing codes.**
-Live at **[clippy-pages.pages.dev](https://clippy-pages.pages.dev/)**.
+Cloudflare deployment: **one Worker with Static Assets and Durable Objects**.
 
 No account, no install, no persistence: two devices join a session with a short code,
 and whatever you copy on one shows up on the other over a persistent WebSocket channel.
@@ -45,7 +45,7 @@ channel per session, and a hard TTL. The clipboard becomes transparent: copy her
              │  TTL + periodic cleanup │
              └─────────────────────────┘
 
-     Static PWA (public/) → Cloudflare Pages
+     Static PWA (public/) → Worker Static Assets
 ```
 
 Two interchangeable implementations of the same protocol:
@@ -80,7 +80,7 @@ a service worker and a web manifest — so it can be served by either runtime un
 | Node + Express | Static hosting and health endpoint in one small process |
 | `ws` | Raw WebSocket server — no abstraction layer over a protocol this simple |
 | Cloudflare Durable Objects | Single-threaded coordination point per session, at the edge |
-| Cloudflare Pages | Static PWA delivery on a CDN |
+| Workers Static Assets | Static PWA and WebSockets on the same origin |
 | Vanilla JS (no framework) | The whole UI is one screen; a framework would be dead weight |
 | Vitest | Fast unit tests for session, validation, QR and transport logic |
 
@@ -99,8 +99,8 @@ Objects give exactly that at the edge, without deploying and babysitting a state
 
 **Deploys must not break installed PWAs.** The service worker precaches the app shell and
 `skipWaiting()`s on install; navigations are network-first (fresh HTML after a deploy, cache
-when offline) and static assets stale-while-revalidate. `BUILD_ID` is replaced with the commit
-SHA at deploy time, so a new version swaps in transparently and the home-screen icon stays put.
+when offline) and static assets stale-while-revalidate. `BUILD_ID` is replaced with a hash of the app shell
+at build time, so a new version swaps in transparently and the home-screen icon stays put.
 
 **Validation at the edge of the process.** Every inbound message goes through size checks,
 type checks and rate limiting before the handler ever sees it (`server/security.js`).
@@ -144,16 +144,24 @@ Cloudflare Workers mock (`tests/__mocks__/cloudflare-workers.js`).
 
 ## Deployment
 
-GitHub Actions (`.github/workflows/deploy-pages.yml`) runs on every push to `main`:
-verifies Cloudflare credentials, creates the Pages project if it does not exist, and deploys.
+Deploy as a **Cloudflare Worker**, named `clippy-realtime`. Its single deployment serves
+static assets, `/health`, `/ws`, and the `ClippyCoordinator` Durable Object.
+The existing SQLite migration and Worker name are retained.
 
 ```bash
-npm run cf:realtime:deploy   # Durable Object worker
-npm run cf:pages:deploy      # static PWA
-npm run cf:deploy            # both
+npm ci
+npm test
+npm run cf:check             # build + validate locally, no deployment
+npm run deploy              # build + publish Worker and assets
+npm run cf:dev              # full Cloudflare runtime locally
 ```
 
-See [`cloudflare/DEPLOY.md`](cloudflare/DEPLOY.md) for the full setup.
+GitHub Actions (`.github/workflows/deploy-cloudflare.yml`) tests and validates PRs;
+pushes to `main` also deploy using `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+Alternatively connect GitHub through Cloudflare Workers Builds; enable only one deployment pipeline.
+
+See [`cloudflare/DEPLOY.md`](cloudflare/DEPLOY.md) for exact dashboard settings,
+credentials, migration from Pages, and verification.
 
 ---
 

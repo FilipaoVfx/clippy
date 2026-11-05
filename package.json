@@ -9,12 +9,11 @@
     "test:coverage": "vitest run --coverage",
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "deploy": "npm run cf:pages:deploy",
-    "cf:pages:dev": "npx wrangler pages dev public",
-    "cf:pages:deploy": "npx wrangler pages deploy ./public --project-name clippy-pages",
-    "cf:realtime:dev": "npx wrangler dev --config cloudflare/realtime/wrangler.toml",
-    "cf:realtime:deploy": "npx wrangler deploy --config cloudflare/realtime/wrangler.toml",
-    "cf:deploy": "npm run cf:realtime:deploy && npm run cf:pages:deploy"
+    "build": "node scripts/build.cjs",
+    "deploy": "wrangler deploy",
+    "cf:dev": "wrangler dev",
+    "cf:check": "wrangler deploy --dry-run --outdir .wrangler/deploy-check",
+    "cf:deploy": "npm run deploy"
   },
   "keywords": [
     "clipboard",
@@ -30,6 +29,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "4.158.0"
   }
 }

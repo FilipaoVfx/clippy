@@ -1,17 +1,16 @@
+import { coordinatorNameFor } from "./realtime/src/index.js";
+export { ClippyCoordinator } from "./realtime/src/index.js";
+
 const SPA_ENTRY = "/index.html";
 const HEALTH_PATH = "/health";
 const WS_PATH = "/ws";
-
-const CODE_PATTERN = /^[A-Z]{3}-[0-9]{2}[A-Z]$/;
 
 /**
  * Sessions are sharded across Durable Objects by pairing code, so concurrent
  * sessions do not contend for a single object's request throughput.
  */
 function getCoordinator(env, request) {
-  const code = String(new URL(request.url).searchParams.get("code") || "").toUpperCase();
-  const coordinatorName = CODE_PATTERN.test(code) ? code : env.CLIPPY_COORDINATOR_NAME || "lobby";
-  const id = env.CLIPPY_COORDINATOR.idFromName(coordinatorName);
+  const id = env.CLIPPY_COORDINATOR.idFromName(coordinatorNameFor(request));
   return env.CLIPPY_COORDINATOR.get(id);
 }
 
@@ -87,3 +86,4 @@ export default {
     return serveAsset(request, env);
   },
 };
+

@@ -1,120 +1,113 @@
-# Cloudflare Pages deployment
+# Desplegar Clippy en Cloudflare Workers
 
-## Estructura
+Usa **Workers**, con el nombre **`clippy-realtime`**. Un solo despliegue incluye
+la PWA, los archivos estáticos, `/health`, `/ws` y el Durable Object.
+No hace falta crear Pages, una base D1, KV, R2, ni configurar una URL de backend.
 
-- `public/` contiene los assets estaticos.
-- `public/_worker.js` sirve el SPA, expone `/health` y redirige `/ws` al Durable Object.
-- `cloudflare/realtime/` contiene el Worker `clippy-realtime` con el Durable Object `ClippyCoordinator`.
+## Opción A: GitHub Actions (ya incluida)
 
-## Por que hay dos despliegues
+1. En Cloudflare, copia el **Account ID** de tu cuenta.
+2. Crea un API token desde **My Profile → API Tokens → Create Token**.
+   Usa la plantilla **Edit Cloudflare Workers**, limitada a la cuenta de destino.
+   Para este despliegue necesita permisos de escritura de Workers Scripts y
+   lectura de Account Settings; conserva los permisos adicionales de la plantilla.
+   Si luego agregas rutas de dominio por Wrangler, necesitarás también Workers Routes
+   sobre esa zona. Para `workers.dev` no hace falta configurar una zona.
+3. En GitHub → `FilipaoVfx/clippy` → **Settings → Secrets and variables → Actions**,
+   configura `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
+   Si ya existen, comprueba que apuntan a la cuenta correcta y siguen vigentes.
+4. Abre **Actions → Deploy Cloudflare → Run workflow → main**.
+   También se ejecuta automáticamente con cada push a `main`.
+5. Espera los pasos de pruebas, validación y despliegue. El último imprime la URL
+   `https://clippy-realtime.<tu-subdominio>.workers.dev`.
+6. En Cloudflare → **Workers & Pages**, abre `clippy-realtime`.
+   La vinculación `CLIPPY_COORDINATOR` y la clase `ClippyCoordinator` se crean
+   automáticamente desde `wrangler.toml`.
 
-Cloudflare Pages puede usar bindings de Durable Objects, pero el Durable Object debe existir en un Worker aparte. Por eso este repo queda dividido en:
+Los nombres de ambos secretos ya existían al preparar esta configuración;
+esto no comprueba por sí solo que sus valores o permisos sean válidos.
 
-1. Pages para frontend y edge routing.
-2. Worker aparte para el realtime.
+## Opción B: conectar GitHub desde Cloudflare
 
-## Despliegue
+Usa esta alternativa si prefieres que Cloudflare construya y despliegue el repo.
+Primero desactiva el workflow **Deploy Cloudflare** en GitHub Actions para evitar
+dos publicaciones simultáneas. Si el Worker ya existe, conecta su repositorio en
+**Settings → Builds**; si no, créalo mediante la opción de importar un repositorio.
 
-1. Despliega el Worker realtime:
+1. En **Workers & Pages → Create application**, elige importar/conectar GitHub
+   para crear un **Worker**.
+2. Autoriza el acceso a `FilipaoVfx/clippy` y selecciona ese repositorio.
+3. Usa estos valores:
 
-```bash
-npm run cf:realtime:deploy
-```
+| Campo | Valor |
+| --- | --- |
+| Nombre del Worker | `clippy-realtime` |
+| Rama de producción | `main` |
+| Root directory | `/` (raíz del repositorio) |
+| Build command | `npm test` |
+| Deploy command | `npm run deploy` |
+| Node.js | `22` (también declarado en `.node-version`) |
 
-2. Despliega Pages:
+`npm run deploy` ejecuta Wrangler, cuyo `[build]` genera `dist/` automáticamente.
+El instalador usa `package-lock.json`; no es necesario añadir `npm install` al
+Build command. No hay campo de directorio de salida Pages: Wrangler usa `dist/`.
+El nombre en el dashboard debe coincidir con `name` en `wrangler.toml`.
 
-```bash
-npm run cf:pages:deploy
-```
+4. Haz el primer despliegue desde `main`. Desactiva por ahora los despliegues de
+   ramas no productivas: la primera creación de Durable Objects requiere aplicar
+   la migración con `wrangler deploy`, y las vistas previas no deben compartir
+   accidentalmente las sesiones de producción.
+5. Cloudflare administra la autenticación del build. No publiques un token dentro
+   del código ni agregues variables de backend al navegador.
+6. Abre la URL `workers.dev` que indique Cloudflare.
 
-El script `cf:pages:deploy` ejecuta:
+## Si ya tenías Pages
 
-```bash
-npx wrangler pages deploy ./public --project-name clippy-pages
-```
+Se conserva el nombre del Worker `clippy-realtime`, la clase `ClippyCoordinator`
+y su migración `v1`, para actualizar el mismo namespace en la misma cuenta.
+No borres el Worker anterior ni cambies su nombre al importar el proyecto.
+La configuración separada `cloudflare/realtime/wrangler.toml` queda solo como
+referencia del despliegue anterior; todos los comandos actuales usan el archivo raíz.
 
-3. Si quieres un solo comando para ambos despliegues:
+El sitio Pages anterior no se elimina ni se actualiza con este pipeline.
+Usa la nueva URL del Worker. Si tenías la PWA instalada desde `pages.dev`, debes
+instalarla desde el nuevo origen para usar esta versión. Un dominio propio permite
+conservar un origen estable en futuros cambios de infraestructura.
 
-```bash
-npm run cf:deploy
-```
+## Dominio propio (opcional)
 
-## CI / Cloudflare Build
+En el Worker → **Settings → Domains & Routes → Add → Custom Domain**, agrega
+un subdominio de una zona de tu cuenta, por ejemplo `clippy.tudominio.com`.
+Cloudflare configura HTTPS. Frontend y WebSockets usan automáticamente ese origen.
 
-Para este repo, **no uses** `npx wrangler deploy` para Pages.
+## Verificación
 
-- Correcto para Pages: `npm run cf:pages:deploy`
-- Correcto para Worker realtime: `npm run cf:realtime:deploy`
-- Alias estandar: `npm run deploy` (publica Pages)
+- Abre `/`: debe aparecer la app.
+- Abre `/health`: debe devolver JSON.
+- Abre la misma URL en dos dispositivos; crea una sesión y une el segundo por
+  código o QR. Envía texto e imagen en ambos sentidos.
+- Recarga uno de los dispositivos para comprobar la reconexión.
+- En DevTools, `/ws?code=...` debe completar el upgrade WebSocket con estado 101.
+- Tras un nuevo despliegue, comprueba que `sw.js` cambia de identificador cuando
+  cambia el contenido del app shell. No hace falta reinstalar la PWA en el mismo origen.
 
-Si en Cloudflare tienes un campo **Deploy command**, pega:
+## Desarrollo y validación local
 
-```bash
-npm run cf:pages:deploy
-```
-
-Opcional si quieres publicar ambos (realtime + pages) en un solo pipeline:
-
-```bash
-npm run cf:deploy
-```
-
-## Token de API para CI
-
-Si usas `CLOUDFLARE_API_TOKEN`, debe incluir permisos de Pages en la cuenta correcta.
-
-- Recomendado: template **Edit Cloudflare Workers**.
-- Custom token: agrega al menos `Pages Write` (o `Pages Read` para solo lectura).
-- Si despliegas tambien el Worker realtime, agrega permisos de Workers (`Workers Scripts Write`) y bindings asociados.
-
-Si ves `Authentication error [code: 10000]` durante `wrangler pages deploy`, normalmente es un token invalido, expirado o sin `Pages Write`.
-
-## GitHub Actions
-
-Se agrego el workflow [`deploy-pages.yml`](../.github/workflows/deploy-pages.yml) para desplegar **ambos** componentes en `push` a `main` y manualmente con `workflow_dispatch`.
-
-Orden del workflow:
-
-1. Verifica autenticacion.
-2. Crea el proyecto Pages si no existe.
-3. Despliega `clippy-realtime`.
-4. Despliega Pages.
-
-Configura este secret en GitHub:
-
-1. Ve a `Repository Settings -> Secrets and variables -> Actions`.
-2. Crea `CLOUDFLARE_API_TOKEN`.
-3. Crea `CLOUDFLARE_ACCOUNT_ID` (tu account id de Cloudflare).
-4. Pega el token con permisos de Pages y Workers en `CLOUDFLARE_API_TOKEN`.
-5. (Opcional) En `Variables`, crea `CF_PAGES_PROJECT` con el nombre exacto del proyecto Pages.
-
-El workflow usa:
-
-```yaml
-env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
-```
-
-Si usas Git integration de Pages (sin direct upload), no necesitas `wrangler pages deploy`; define build/output en el dashboard y deja `wrangler.toml` como source of truth de bindings.
-
-## Desarrollo local
-
-En una terminal:
+Requiere Node.js 22 o posterior compatible con Wrangler.
 
 ```bash
-npm run cf:realtime:dev
+npm ci
+npm test
+npm run cf:check
+npm run cf:dev
 ```
 
-En otra:
+`cf:dev` sirve la app y el Durable Object en un solo runtime local.
+`npm run dev` mantiene la alternativa Express del proyecto.
+`dist/` y `.wrangler/` son generados y no se versionan.
 
-```bash
-npm run cf:pages:dev
-```
+## Fuentes oficiales
 
-## Configuracion incluida
-
-- `wrangler.toml` enlaza Pages con el Worker `clippy-realtime`.
-- `cloudflare/realtime/wrangler.toml` crea la migracion inicial del Durable Object.
-- Los valores de TTL, rate limit y tamano maximo del mensaje quedan configurados en el Worker realtime y se pueden ajustar desde sus `vars`.
+- [Workers con archivos estáticos](https://developers.cloudflare.com/workers/static-assets/)
+- [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
+- [Durable Objects](https://developers.cloudflare.com/durable-objects/)

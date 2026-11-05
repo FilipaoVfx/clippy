@@ -12,8 +12,8 @@
  *               assets use stale-while-revalidate (instant load + background
  *               refresh). WebSocket/health/cross-origin requests are bypassed.
  *
- * BUILD_ID is replaced at deploy time with the commit SHA (see the deploy
- * workflow). When it changes, the browser sees new SW bytes, installs the new
+ * BUILD_ID is replaced at build time with an app-shell content hash by
+ * scripts/build.cjs. When it changes, the browser sees new SW bytes, installs the new
  * version, and swaps it in transparently — the home-screen icon stays put.
  */
 const BUILD_ID = '__BUILD_ID__';
