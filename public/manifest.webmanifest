@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#f4ece5",
-  "theme_color": "#f4ece5",
+  "background_color": "#f7f2ea",
+  "theme_color": "#f7f2ea",
   "categories": ["productivity", "utilities"],
   "launch_handler": {
     "client_mode": "navigate-existing"

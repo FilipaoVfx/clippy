@@ -254,6 +254,33 @@ the same type and semantic palette. Toasts use 16px inline SVG status icons;
 identical messages replace one another and the visible stack is capped at one
 on mobile (760px and below) or two on desktop so bursts do not cover the task.
 
+## Motion
+
+Two layers share one visual language: yellow pasta strands are connections,
+devices are nodes and particles are data. Food, plates, cutlery and kitchens
+never appear. The palette is warm only: ivory `#F7F2EA`, cream `#FFF8ED`, pasta
+`#FFC857`, golden `#FFB52E`, orange `#FF963D`, peach `#F5C6A5` and charcoal
+`#191919` (`--color-*` tokens). `#A5A09A` is decoration only, because it fails
+contrast as text.
+
+- **Live layer (Three.js, `public/js/visual/`)**: a full-viewport canvas behind
+  the HTML (`.visual-stage`, `pointer-events: none`). It draws toon-shaded tubes
+  with an ink outline and stylised devices in the side gutters, and it only
+  represents confirmed app events (see `docs/visual-engine.md`). Where WebGL,
+  motion or data are unavailable, the static composition (`.device-scene`)
+  remains.
+- **Cinematic layer (Remotion, [`motion/`](motion/README.md))**: rendered to
+  static WebM/MP4 files plus posters; no Remotion runtime ships. On the home view
+  the **motion showcase** sits below the pairing panel: a 16:9 brand intro and
+  four square clips (Create, Pair, Share, Sync). They use 3px ink borders, hard
+  shadows (`--motion-shadow`) and warm `--tone-*` tokens, with darker
+  counterparts in the dark theme. Clips load lazily and play only while
+  visible. Reduced motion or Save-Data keeps the poster frames, and a pause/play
+  control covers autoplay.
+
+A link always follows the same sequence: the strand grows, ignites and lights
+up, particles speed up, and the devices confirm with a pop and a ring.
+
 ## Do's and Don'ts
 
 ### Do:

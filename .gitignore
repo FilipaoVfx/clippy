@@ -5,3 +5,4 @@ dist/
 .wrangler/
 .agents/
 skills-lock.json
+out/

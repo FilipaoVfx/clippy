@@ -15,6 +15,21 @@
     createRetries: 0,    // guards against a code-collision loop
   };
 
+  // ── Visual events (docs/visual-engine.md) ────────────────
+  // Confirmed facts only, never codes, tokens or content. The visual layer is
+  // optional: if bus.js failed to load, the app runs exactly the same.
+  let visualSeq = 0;
+  function visual(name, payload) {
+    window.PasttyBus?.emit(name, payload);
+  }
+  function visualId() {
+    visualSeq += 1;
+    return `local-${visualSeq}`;
+  }
+  // Text/image sends resolve in order: the server answers clip_sent/image_sent
+  // without echoing an id, so a FIFO pairs each confirmation with its send.
+  const pendingVisual = { text: [], image: [] };
+
   // ── Session codes (RF-02) ────────────────────────────────
   // Sessions are sharded server-side by code, so the code has to exist before
   // connecting. The client picks it and the server rejects collisions, which
@@ -192,7 +207,11 @@
       const sent = WS.send({ type: 'send_image', data: dataUri });
       if (!sent) {
         UI.showToast('Not connected. Cannot send image.', 'error');
+        return;
       }
+      const transferId = visualId();
+      pendingVisual.image.push(transferId);
+      visual('transfer:started', { transferId, direction: 'out', contentType: 'image' });
     };
     reader.onerror = () => UI.showToast('Failed to read image file.', 'error');
     reader.readAsDataURL(file);
@@ -271,6 +290,7 @@
     }
 
     UI.showTransferProgress('Sending', 0);
+    visual('transfer:started', { transferId: outgoing.id, direction: 'out', contentType: 'video' });
   }
 
   /**
@@ -315,6 +335,7 @@
   function abortOutgoing(reason) {
     if (!outgoing) return;
     WS.send({ type: 'transfer_abort', transferId: outgoing.id, reason });
+    visual('transfer:aborted', { transferId: outgoing.id });
     outgoing = null;
     UI.hideTransferProgress();
     UI.showToast(reason, 'error');
@@ -473,18 +494,22 @@
     // Connection events
     WS.on('ws_open', () => {
       UI.setStatus('connected', 'Connected to server');
+      visual('connection:online');
     });
 
     WS.on('ws_close', () => {
       UI.setStatus('disconnected', 'Disconnected');
+      visual('connection:offline');
     });
 
     WS.on('reconnecting', (data) => {
       UI.setStatus('disconnected', `Reconnecting (${data.attempt}/${data.maxAttempts})...`);
+      visual('device:reconnecting', { attempt: data.attempt, maxAttempts: data.maxAttempts });
     });
 
     WS.on('reconnect_failed', () => {
       UI.setStatus('disconnected', 'Connection failed');
+      visual('connection:failed');
       UI.showToast('Unable to connect to server. Please refresh.', 'error', 5000);
     });
 
@@ -537,6 +562,7 @@
       startTTLTimer();
 
       UI.showToast('Session created! Share the code.', 'success');
+      visual('session:created', { connectedDevices: 1, maxDevices: 5 });
 
       // Persist credentials for reconnection (RF-09)
       saveSessionToStorage(data);
@@ -558,6 +584,7 @@
       UI.showView('connected');
       UI.setStatus('connected', 'Synced with peer');
       UI.showToast('Connected to session!', 'success');
+      visual('session:joined', { connectedDevices: data.devices, maxDevices: 5 });
 
       // Persist credentials for reconnection (RF-09)
       saveSessionToStorage(data);
@@ -582,6 +609,7 @@
         UI.setStatus('connected', `Synced · ${data.devices} device${data.devices > 1 ? 's' : ''}`);
         UI.showToast('Another device connected!', 'info');
       }
+      visual('device:connected', { connectedDevices: data.devices, maxDevices: 5 });
     });
 
     // Session resumed after reconnection
@@ -594,18 +622,26 @@
       UI.showView('connected');
       UI.setStatus('connected', `Synced · ${data.devices} device${data.devices > 1 ? 's' : ''}`);
       UI.showToast('Session resumed!', 'success');
+      visual('device:reconnected', { connectedDevices: data.devices, maxDevices: 5 });
     });
 
     // Clip received
     WS.on('receive_clip', (data) => {
       UI.addClipToFeed(data.content, data.timestamp);
       UI.showToast('New clip received!', 'info', 2000);
+      visual('transfer:received', { transferId: visualId(), contentType: 'text' });
     });
 
     // Clip sent confirmation
     WS.on('clip_sent', () => {
       UI.clearClipInput();
       UI.showToast('Sent!', 'success', 1500);
+      visual('transfer:completed', {
+        transferId: pendingVisual.text.shift(),
+        direction: 'out',
+        contentType: 'text',
+        confirmation: 'relayed',
+      });
     });
 
     // ── Chunked video transfer (RF-15) ──────────────────────
@@ -624,6 +660,7 @@
       };
       UI.showTransferProgress('Receiving', 0);
       WS.send({ type: 'transfer_ready', transferId: data.transferId });
+      visual('transfer:received', { transferId: data.transferId, contentType: 'video' });
     });
 
     // Receiver: a chunk arrived. Acknowledge so the sender's window advances.
@@ -670,6 +707,9 @@
     // the receiver assembles the blob.
     WS.on('transfer_complete', (data) => {
       if (outgoing && data.transferId === outgoing.id) {
+        visual('transfer:completed', {
+          transferId: outgoing.id, direction: 'out', contentType: 'video', confirmation: 'complete',
+        });
         outgoing = null;
         UI.hideTransferProgress();
         UI.showToast('Video sent!', 'success', 1500);
@@ -687,11 +727,15 @@
       const blob = new Blob(incoming.chunks, { type: incoming.mimeType });
       UI.addVideoToFeed(blob, incoming.name, Date.now());
       UI.showToast('Video received!', 'info', 2000);
+      visual('transfer:completed', {
+        transferId: incoming.id, direction: 'in', contentType: 'video', confirmation: 'complete',
+      });
       discardIncoming();
     });
 
     // Either side gave up.
     WS.on('transfer_aborted', (data) => {
+      visual('transfer:aborted', { transferId: data.transferId });
       if (outgoing && data.transferId === outgoing.id) {
         outgoing = null;
         UI.hideTransferProgress();
@@ -707,26 +751,35 @@
     WS.on('receive_image', (data) => {
       UI.addImageToFeed(data.data, data.mimeType, data.timestamp);
       UI.showToast('Image received!', 'info', 2000);
+      visual('transfer:received', { transferId: visualId(), contentType: 'image' });
     });
 
     // Image sent confirmation
     WS.on('image_sent', () => {
       UI.showToast('Image sent!', 'success', 1500);
+      visual('transfer:completed', {
+        transferId: pendingVisual.image.shift(),
+        direction: 'out',
+        contentType: 'image',
+        confirmation: 'relayed',
+      });
     });
 
     // Peer disconnected
     WS.on('peer_disconnected', () => {
       UI.showToast('The other device has disconnected.', 'error', 4000);
       UI.setStatus('connected', 'Peer disconnected');
+      visual('device:disconnected', { connectedDevices: 1, maxDevices: 5 });
       resetToHome();
     });
 
     WS.on('device_disconnected', (data) => {
       UI.showToast('A device disconnected.', 'info', 2500);
+      const devices = typeof data?.devices === 'number' ? data.devices : 1;
       if (state.view === 'connected') {
-        const devices = typeof data?.devices === 'number' ? data.devices : 1;
         UI.setStatus('connected', `Synced - ${devices} device${devices > 1 ? 's' : ''}`);
       }
+      visual('device:disconnected', { connectedDevices: Math.max(1, devices), maxDevices: 5 });
     });
 
     // Session expired
@@ -734,6 +787,7 @@
       clearSessionStorage();
       WS.clearResumeCredentials();
       UI.showToast('Session expired.', 'error', 4000);
+      visual('session:expired');
       resetToHome();
     });
 
@@ -766,7 +820,11 @@
 
     if (!sent) {
       UI.showToast('Not connected. Cannot send.', 'error');
+      return;
     }
+    const transferId = visualId();
+    pendingVisual.text.push(transferId);
+    visual('transfer:started', { transferId, direction: 'out', contentType: 'text' });
   }
 
   /**
@@ -796,6 +854,9 @@
     // the object URLs, so nothing received outlives the session.
     outgoing = null;
     discardIncoming();
+    pendingVisual.text.length = 0;
+    pendingVisual.image.length = 0;
+    visual('session:closed');
 
     UI.showView('home');
     UI.clearPairingQR();

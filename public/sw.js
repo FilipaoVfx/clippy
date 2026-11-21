@@ -24,7 +24,9 @@ const SHELL = [
   '/',
   '/index.html',
   '/css/style.css',
+  '/js/bus.js',
   '/js/design.js',
+  '/js/motion.js',
   '/assets/pastty-devices.webp',
   '/fonts/manrope-400.ttf',
   '/fonts/manrope-600.ttf',
@@ -78,6 +80,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname === '/ws' || url.pathname === '/health') return;
+  // Showcase videos stream with Range requests straight from the network;
+  // caching them would bloat storage and break seeking in some browsers.
+  if (url.pathname.startsWith('/assets/motion/')) return;
 
   // Navigations → network-first so a fresh deploy is always served when online.
   if (req.mode === 'navigate') {

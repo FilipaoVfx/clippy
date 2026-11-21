@@ -8,6 +8,10 @@ The Pastty identity follows the supplied Drive concept: ivory, black type, yello
 pasta connections and 3D devices. Home, pairing, sharing and the PWA use the same
 system, with self-hosted fonts and offline assets. See [DESIGN.md](DESIGN.md) and
 [PRODUCT.md](PRODUCT.md). The technical Worker and protocol names remain Clippy.
+The motion identity has two layers. A live Three.js scene behind the UI
+represents real session events, and Remotion compositions are rendered to static
+clips for the landing page. See [docs/visual-engine.md](docs/visual-engine.md)
+and [motion/](motion/README.md).
 
 No account, no install, no persistence: two devices join a session with a short code,
 and whatever you copy on one shows up on the other over a persistent WebSocket channel.

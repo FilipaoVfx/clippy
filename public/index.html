@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Pastty — Share text and images between devices in real-time. No login, no apps. Just a code and instant sync.">
-  <meta name="theme-color" content="#f4ece5">
+  <meta name="theme-color" content="#f7f2ea">
   <title>Pastty — Clipboard Sync</title>
 
   <!-- PWA -->
@@ -25,6 +25,9 @@
 <body>
   <a class="skip-link" href="#main">Skip to connection</a>
   <div class="device-scene" aria-hidden="true"></div>
+  <!-- Three.js layer (js/visual/). Loads after the page is usable; the static
+       composition above stays as the fallback. Never receives pointer events. -->
+  <div class="visual-stage" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="/" aria-label="Pastty home"><img src="/icon.svg" alt="" width="48" height="48"><span>Pastty<span class="brand-period">.</span></span></a>
     <nav class="site-nav" aria-label="Main navigation">
@@ -67,8 +70,61 @@
       <ul class="feature-strip" aria-label="Session features">
         <li><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-12h-8z"/></svg>Real-time</li>
         <li><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>No account</li>
-        <li><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12c-6-10-15 6-7 6 5 0 9-12 14-12 8 0-1 16-7 6Z"/></svg>Ephemeral</li>
+        <li><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 12c-6-10-15 6-7 6 5 0 9-12 14-12 8 0-1 16-7 6Z"/></svg>Nothing stored</li>
       </ul>
+
+      <!-- Motion showcase: pre-rendered Remotion clips (motion/), loaded only when scrolled near. -->
+      <section class="motion-showcase" aria-labelledby="motion-title">
+        <div class="motion-head">
+          <p class="motion-kicker">See it move</p>
+          <h2 id="motion-title">One little strand between your devices<span class="brand-period">.</span></h2>
+        </div>
+        <figure class="motion-stage">
+          <video class="motion-video" data-motion data-rest="900" muted playsinline preload="none" width="1600" height="900" poster="/assets/motion/brand.webp" aria-label="Animation: a pasta strand unfurls, ties the Pastty loop and lights up, then the wordmark lands with Copy. Share. Sync.">
+            <source data-src="/assets/motion/brand.webm" type='video/webm; codecs="vp9"'>
+            <source data-src="/assets/motion/brand.mp4" type='video/mp4; codecs="avc1.640028"'>
+          </video>
+          <button class="motion-toggle" type="button" data-motion-toggle aria-pressed="false" aria-label="Pause animations"><svg class="icon-pause" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg><svg class="icon-play" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg></button>
+        </figure>
+        <ol class="motion-chapters">
+          <li class="motion-card" data-tone="pasta">
+            <video class="motion-video" data-motion data-rest="1200" muted playsinline preload="none" width="720" height="720" poster="/assets/motion/created.webp" aria-hidden="true">
+              <source data-src="/assets/motion/created.webm" type='video/webm; codecs="vp9"'>
+              <source data-src="/assets/motion/created.mp4" type='video/mp4; codecs="avc1.64001f"'>
+            </video>
+            <span class="motion-step">01 · Create</span>
+            <h3>A room, a code.</h3>
+            <p>This device opens a room and gets a short code and a QR.</p>
+          </li>
+          <li class="motion-card" data-tone="apricot">
+            <video class="motion-video" data-motion data-rest="1200" muted playsinline preload="none" width="720" height="720" poster="/assets/motion/pairing.webp" aria-hidden="true">
+              <source data-src="/assets/motion/pairing.webm" type='video/webm; codecs="vp9"'>
+              <source data-src="/assets/motion/pairing.mp4" type='video/mp4; codecs="avc1.64001f"'>
+            </video>
+            <span class="motion-step">02 · Pair</span>
+            <h3>One code. Instant link.</h3>
+            <p>Scan or type it on the other device and the strand connects.</p>
+          </li>
+          <li class="motion-card" data-tone="butter">
+            <video class="motion-video" data-motion data-rest="1200" muted playsinline preload="none" width="720" height="720" poster="/assets/motion/transfer.webp" aria-hidden="true">
+              <source data-src="/assets/motion/transfer.webm" type='video/webm; codecs="vp9"'>
+              <source data-src="/assets/motion/transfer.mp4" type='video/mp4; codecs="avc1.64001f"'>
+            </video>
+            <span class="motion-step">03 · Share</span>
+            <h3>Text, images, video.</h3>
+            <p>Send it from one side; it lands on the other in real time.</p>
+          </li>
+          <li class="motion-card" data-tone="peach">
+            <video class="motion-video" data-motion data-rest="1200" muted playsinline preload="none" width="720" height="720" poster="/assets/motion/sync.webp" aria-hidden="true">
+              <source data-src="/assets/motion/sync.webm" type='video/webm; codecs="vp9"'>
+              <source data-src="/assets/motion/sync.mp4" type='video/mp4; codecs="avc1.64001f"'>
+            </video>
+            <span class="motion-step">04 · Sync</span>
+            <h3>Every device in step.</h3>
+            <p>Up to five devices; one that drops picks back up on its own.</p>
+          </li>
+        </ol>
+      </section>
     </section>
 
     <!-- ==================== VIEW: WAITING ==================== -->
@@ -223,7 +279,9 @@
   <!-- Toast Notifications -->
   <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
 
+  <script defer src="js/bus.js"></script>
   <script defer src="js/design.js"></script>
+  <script defer src="js/motion.js"></script>
   <script defer src="js/qr.js"></script>
   <script defer src="js/ws.js"></script>
   <script defer src="js/ui.js"></script>
@@ -253,5 +311,6 @@
       }).catch(() => { /* SW registration is best-effort */ });
     }
   </script>
+  <script type="module" src="js/visual/boot.js"></script>
 </body>
 </html>
