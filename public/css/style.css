@@ -525,12 +525,6 @@ body::-webkit-scrollbar-thumb,.clip-feed::-webkit-scrollbar-thumb {
   width:19px;
   height:19px;
 }
-.site-footer {
-  padding:0 20px 22px;
-  text-align:center;
-  font-size:11px;
-  color:var(--muted);
-}
 /* One composed entrance; the application itself stays still while in use. */
 @keyframes room-arrives {
   from {
@@ -1602,5 +1596,225 @@ body.visual-live .device-scene,body.visual-live[data-view] .device-scene {
   }
   button,.device-scene,.ttl-progress,.transfer-bar {
     transition:none;
+  }
+}
+
+/* ── Shared by the home page and the content pages (site/layout.mjs) ── */
+.page-footer {
+  margin-top:72px;
+  border-top:3px solid var(--motion-line);
+  background:var(--surface-solid);
+}
+.footer-inner {
+  max-width:1600px;
+  margin:auto;
+  padding:44px clamp(20px,5vw,88px) 48px;
+  display:grid;
+  grid-template-columns:minmax(220px,1.4fr) repeat(3,minmax(140px,1fr));
+  gap:32px;
+}
+.footer-brand .brand {
+  font-size:25px;
+}
+.footer-brand .brand img {
+  width:40px;
+  height:40px;
+}
+.footer-brand p {
+  margin-top:12px;
+  max-width:26ch;
+  color:var(--muted);
+  font-size:14px;
+}
+.footer-col h2 {
+  font:800 12px/1.4 var(--font-sans);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:12px;
+}
+.footer-col ul {
+  list-style:none;
+  padding:0;
+  display:grid;
+  gap:8px;
+}
+.footer-col a {
+  font-size:14px;
+  font-weight:600;
+  text-decoration:none;
+}
+.footer-col a:hover {
+  text-decoration:underline;
+  text-decoration-color:var(--yellow-ink);
+}
+.page-related {
+  list-style:none;
+  padding:0;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:16px;
+}
+.page-related a {
+  position:relative;
+  display:grid;
+  gap:4px;
+  height:100%;
+  padding:18px 56px 18px 20px;
+  border:2px solid var(--motion-line);
+  border-radius:18px;
+  background:var(--surface-solid);
+  box-shadow:4px 4px 0 var(--motion-shadow);
+  text-decoration:none;
+  transition:transform .18s var(--ease),box-shadow .18s var(--ease);
+}
+.page-related a:hover {
+  transform:translate(-2px,-2px);
+  box-shadow:6px 6px 0 var(--motion-shadow);
+}
+.page-related svg {
+  position:absolute;
+  right:18px;
+  top:50%;
+  width:20px;
+  height:20px;
+  transform:translateY(-50%);
+}
+.related-kicker {
+  font-size:12px;
+  font-weight:700;
+  color:var(--yellow-ink);
+}
+.related-title {
+  font-weight:800;
+  line-height:1.35;
+}
+.page-faq {
+  display:grid;
+  gap:12px;
+}
+.page-faq details {
+  border:2px solid var(--motion-line);
+  border-radius:16px;
+  background:var(--surface-solid);
+}
+.page-faq summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 20px;
+  cursor:pointer;
+  list-style:none;
+}
+.page-faq summary::-webkit-details-marker {
+  display:none;
+}
+.page-faq summary::after {
+  content:"+";
+  flex-shrink:0;
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  border:2px solid var(--motion-line);
+  border-radius:50%;
+  font:400 20px/1 var(--font-display);
+  transition:transform .2s var(--ease);
+}
+.page-faq details[open] summary::after {
+  transform:rotate(45deg);
+}
+.page-faq summary h3 {
+  font:700 17px/1.4 var(--font-sans);
+}
+.faq-answer {
+  padding:0 20px 18px;
+  color:var(--muted);
+}
+.faq-answer > * {
+  max-width:68ch;
+}
+.faq-answer p + p {
+  margin-top:.8em;
+}
+.faq-answer a,.about-more a {
+  text-decoration-color:var(--yellow-ink);
+}
+/* Open section on the page (not another card): the showcase above is the
+   boxed piece, and the guides and answers inside are their own cards. */
+.home-about {
+  margin:72px auto 0;
+  padding:0 clamp(4px,1vw,12px);
+}
+.about-head {
+  max-width:660px;
+}
+.about-head h2 {
+  margin:0 0 12px;
+  font:400 clamp(28px,4vw,40px)/1.08 var(--font-display);
+}
+.about-head h2 + p {
+  color:var(--muted);
+  font-size:17px;
+}
+.about-facts {
+  list-style:none;
+  padding:0;
+  margin:28px 0 8px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+}
+.about-facts li {
+  --fact-tone:var(--tone-butter);
+  display:grid;
+  gap:2px;
+  padding:14px 16px;
+  border:2px solid var(--motion-line);
+  border-radius:16px;
+  background:var(--fact-tone);
+}
+.about-facts li:nth-child(2) {
+  --fact-tone:var(--tone-apricot);
+}
+.about-facts li:nth-child(3) {
+  --fact-tone:var(--tone-pasta);
+}
+.about-facts li:nth-child(4) {
+  --fact-tone:var(--tone-peach);
+}
+.about-facts strong {
+  font-weight:800;
+}
+/* Ink on the tone, never grey; the label's weight carries the hierarchy. */
+.about-facts span {
+  font-size:13px;
+}
+.about-sub {
+  margin:32px 0 14px;
+  font:400 22px/1.2 var(--font-display);
+}
+.about-more {
+  margin-top:16px;
+  font-weight:700;
+}
+@media(max-width:900px) {
+  .footer-inner {
+    grid-template-columns:1fr 1fr;
+  }
+  .footer-brand {
+    grid-column:1 / -1;
+  }
+  .about-facts {
+    grid-template-columns:1fr 1fr;
+  }
+}
+@media(max-width:440px) {
+  .about-facts {
+    grid-template-columns:1fr;
+  }
+  .footer-inner {
+    gap:24px;
   }
 }

@@ -12,7 +12,10 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Express app — serves the frontend
 const app = express();
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Content pages are served without their extension ("/faq" → faq.html), the
+// same way Cloudflare's asset handling serves them in production.
+app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -24,9 +27,17 @@ app.get('/health', (req, res) => {
   });
 });
 
-// SPA fallback
+// Unknown paths: mirror cloudflare/worker.js. Links that carry a pairing code
+// open the app; any other page is a real 404 so it never looks like a second
+// copy of the home page to search engines.
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  if (typeof req.query.code === 'string' && req.query.code) {
+    res.redirect(302, `/?code=${encodeURIComponent(req.query.code)}`);
+    return;
+  }
+  res.status(404).set('X-Robots-Tag', 'noindex');
+  if (req.accepts('html')) res.sendFile(path.join(PUBLIC_DIR, '404.html'));
+  else res.type('text').send('Not found');
 });
 
 // Create HTTP server

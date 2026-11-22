@@ -85,13 +85,18 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/assets/motion/')) return;
 
   // Navigations → network-first so a fresh deploy is always served when online.
+  // Only the app itself refreshes the offline copy: content pages (/faq, /es/…)
+  // and 404s must never be stored as the app shell.
   if (req.mode === 'navigate') {
+    const isApp = url.pathname === '/' || url.pathname === '/index.html';
     event.respondWith(
       (async () => {
         try {
           const fresh = await fetch(req);
-          const cache = await caches.open(CACHE);
-          cache.put('/index.html', fresh.clone());
+          if (isApp && fresh.ok && !fresh.redirected) {
+            const cache = await caches.open(CACHE);
+            cache.put('/index.html', fresh.clone());
+          }
           return fresh;
         } catch {
           const cache = await caches.open(CACHE);

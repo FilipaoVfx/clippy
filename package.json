@@ -15,7 +15,9 @@
     "cf:check": "wrangler deploy --dry-run --outdir .wrangler/deploy-check",
     "cf:deploy": "npm run deploy",
     "vendor:three": "node scripts/vendor-three.mjs",
-    "e2e:visual": "node scripts/e2e-visual.mjs"
+    "e2e:visual": "node scripts/e2e-visual.mjs",
+    "site:build": "node scripts/build-site.mjs",
+    "seo:check": "node scripts/seo-check.mjs"
   },
   "keywords": [
     "clipboard",

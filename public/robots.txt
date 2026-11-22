@@ -1,0 +1,7 @@
+# Pastty: everything public is crawlable. The realtime endpoints are not pages.
+User-agent: *
+Allow: /
+Disallow: /ws
+Disallow: /health
+
+Sitemap: https://pastty.com/sitemap.xml

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f2ea">
+  <title>Privacy: What Pastty Does With Your Data</title>
+  <meta name="description" content="What Pastty handles and what it keeps: no accounts, no stored content, short-lived room codes, and encrypted connections. A plain-language summary.">
+  <link rel="canonical" href="https://pastty.com/privacy">
+  <link rel="alternate" hreflang="en" href="https://pastty.com/privacy">
+  <link rel="alternate" hreflang="es" href="https://pastty.com/es/privacidad">
+  <link rel="alternate" hreflang="x-default" href="https://pastty.com/privacy">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pastty">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="es_LA">
+  <meta property="og:title" content="Privacy: What Pastty Does With Your Data">
+  <meta property="og:description" content="What Pastty handles and what it keeps: no accounts, no stored content, short-lived room codes, and encrypted connections. A plain-language summary.">
+  <meta property="og:url" content="https://pastty.com/privacy">
+  <meta property="og:image" content="https://pastty.com/assets/og-pastty.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Pastty: a pasta strand ties a loop between devices. Copy. Share. Sync.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Privacy: What Pastty Does With Your Data">
+  <meta name="twitter:description" content="What Pastty handles and what it keeps: no accounts, no stored content, short-lived room codes, and encrypted connections. A plain-language summary.">
+  <meta name="twitter:image" content="https://pastty.com/assets/og-pastty.jpg">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://pastty.com/privacy#webpage","url":"https://pastty.com/privacy","name":"Privacy: What Pastty Does With Your Data","description":"What Pastty handles and what it keeps: no accounts, no stored content, short-lived room codes, and encrypted connections. A plain-language summary.","inLanguage":"en","isPartOf":{"@id":"https://pastty.com/#website"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Pastty","item":"https://pastty.com/"},{"@type":"ListItem","position":2,"name":"Privacy","item":"https://pastty.com/privacy"}]}]}</script>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preload" href="/fonts/russo-one-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/fonts/manrope-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body class="content-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Pastty"><img src="/icon.svg" alt="" width="48" height="48"><span>Pastty<span class="brand-period">.</span></span></a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="nav-current" href="/">Open Pastty</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/faq">FAQ</a>
+    </nav>
+    <div class="header-tools">
+      <a class="lang-switch" href="/es/privacidad" hreflang="es" lang="es">Leer en español</a>
+      <button class="theme-toggle" id="btn-theme" type="button" aria-label="Use dark theme" data-label-dark="Use dark theme" data-label-light="Use light theme" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+    </div>
+  </header>
+  <main class="page-main" id="content" tabindex="-1">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Pastty</a></li><li aria-current="page">Privacy</li></ol></nav>
+    <header class="page-hero">
+      <div class="hero-copy">
+        <h1>What Pastty does with your data</h1>
+        <p class="page-lede">The short version: no accounts, nothing you send is stored, and rooms disappear on their own.</p>
+        <div class="page-cta"><a class="btn-primary page-btn" href="/">Open Pastty <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a><span class="cta-note">Free · No app · No account</span></div>
+      </div>
+      
+    </header>
+    <section class="page-section"><h2>In plain words</h2><ul class="page-cards"><li data-tone="pasta"><h3>No account</h3><p>Pastty never asks for your name, email or phone number.</p></li><li data-tone="apricot"><h3>Content is not stored</h3><p>Text, images and videos are relayed to the devices in your room at that moment and are not saved on the server.</p></li><li data-tone="butter"><h3>Short-lived rooms</h3><p>A room lasts 5 minutes from the last join or reconnection, then it is deleted with everything the relay knew about it.</p></li><li data-tone="peach"><h3>Encrypted in transit</h3><p>All traffic uses HTTPS and secure WebSockets. Pastty is not end-to-end encrypted.</p></li></ul></section>
+    <section class="page-section"><h2>What the service does keep, briefly</h2><div class="prose"><p>To run a room, the relay keeps its code, random device identifiers and a reconnection token for each device, and the time they were last seen. These are deleted when the room expires.</p><p>Your IP address is attached to your open connection to limit abuse (how much one address can send per minute). It is dropped when the connection closes and is never stored with your content.</p><p>Your theme choice and your current session are saved in your own browser’s storage, so a reload can put you back in the room. You can clear them by leaving the room or clearing site data.</p></div></section>
+    <section class="page-section"><h2>Who runs the infrastructure</h2><div class="prose"><p>Pastty runs on Cloudflare Workers and Durable Objects. Cloudflare processes each connection to deliver the service and keeps operational logs under its <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">own privacy policy</a>. Pastty itself adds no analytics, advertising or third-party trackers.</p></div></section>
+    <section class="page-section page-callout" data-tone="butter"><h2>Keep your code to yourself</h2><div class="prose"><p>Anyone with a valid code can join your room and see what you send next. Share codes only with people you trust, and press the close button when you are done.</p></div></section>
+    <section class="page-section"><h2>Keep reading</h2><ul class="page-related"><li><a href="/faq"><span class="related-kicker">Help</span><span class="related-title">FAQ</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li><li><a href="/limits"><span class="related-kicker">Reference</span><span class="related-title">Limits</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li><li><a href="/how-it-works"><span class="related-kicker">Start here</span><span class="related-title">How it works</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li></ul></section>
+    <section class="page-final" data-tone="pasta">
+      <h2>Share something in a few seconds.</h2>
+      <p>Open Pastty on two devices, pair them with the code, and send.</p>
+      <a class="btn-primary page-btn" href="/">Open Pastty <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+    </section>
+  </main>
+  <footer class="page-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="/"><img src="/icon.svg" alt="" width="40" height="40" loading="lazy"><span>Pastty<span class="brand-period">.</span></span></a>
+        <p>Less sending to yourself. More getting on with it.</p>
+      </div>
+      <nav class="footer-col" aria-label="Guides"><h2>Guides</h2><ul><li><a href="/copy-text-from-phone-to-computer">Copy text from phone to computer</a></li><li><a href="/send-photos-from-phone-to-computer">Send photos from phone to computer</a></li><li><a href="/iphone-to-windows">iPhone to Windows</a></li><li><a href="/android-to-pc">Android to PC</a></li><li><a href="/airdrop-alternative">AirDrop alternative</a></li></ul></nav>
+      <nav class="footer-col" aria-label="Pastty"><h2>Pastty</h2><ul><li><a href="/">Open Pastty</a></li><li><a href="/how-it-works">How it works</a></li><li><a href="/faq">FAQ</a></li><li><a href="/limits">Limits</a></li><li><a href="/privacy">Privacy</a></li></ul></nav>
+      <nav class="footer-col" aria-label="Language"><h2>Language</h2><ul><li><a href="/" hreflang="en" lang="en">English</a></li><li><a href="/es/" hreflang="es" lang="es">Español</a></li></ul></nav>
+    </div>
+  </footer>
+  <script defer src="/js/design.js"></script>
+</body>
+</html>

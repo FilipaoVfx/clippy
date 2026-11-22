@@ -68,15 +68,50 @@ describe('Cloudflare Worker entrypoint', () => {
     expect(result.headers.get('cache-control')).toContain('must-revalidate');
   });
 
-  it('serves the app shell for unknown HTML navigation paths', async () => {
+  it('answers unknown pages with the 404 page and a real 404 status', async () => {
     const env = bindings();
     env.ASSETS.fetch.mockResolvedValueOnce(new Response('missing', { status: 404 }))
-      .mockResolvedValueOnce(new Response('app shell'));
+      .mockResolvedValueOnce(new Response('not found page', { headers: { 'content-type': 'text/html' } }));
     const result = await worker.fetch(new Request('https://clippy.test/pair', {
       headers: { accept: 'text/html' },
     }), env);
-    expect(await result.text()).toBe('app shell');
-    expect(new URL(env.ASSETS.fetch.mock.calls[1][0].url).pathname).toBe('/index.html');
+    expect(result.status).toBe(404);
+    expect(await result.text()).toBe('not found page');
+    expect(result.headers.get('x-robots-tag')).toBe('noindex');
+    expect(result.headers.get('content-type')).toBe('text/html');
+    expect(new URL(env.ASSETS.fetch.mock.calls[1][0].url).pathname).toBe('/404');
+  });
+
+  it('treats a direct visit to the 404 page as a 404', async () => {
+    const env = bindings();
+    env.ASSETS.fetch.mockResolvedValue(new Response('not found page'));
+    const result = await worker.fetch(new Request('https://clippy.test/404', {
+      headers: { accept: 'text/html' },
+    }), env);
+    expect(result.status).toBe(404);
+  });
+
+  it('sends any unknown path that carries a pairing code to the app', async () => {
+    const env = bindings();
+    env.ASSETS.fetch.mockResolvedValue(new Response('missing', { status: 404 }));
+    const result = await worker.fetch(new Request('https://clippy.test/join?code=ABC-12D', {
+      headers: { accept: 'text/html' },
+    }), env);
+    expect(result.status).toBe(302);
+    expect(result.headers.get('location')).toBe('https://clippy.test/?code=ABC-12D');
+  });
+
+  it('redirects www to the bare domain permanently, keeping path and query', async () => {
+    const env = bindings();
+    const result = await worker.fetch(new Request('https://www.pastty.com/faq?ref=x'), env);
+    expect(result.status).toBe(301);
+    expect(result.headers.get('location')).toBe('https://pastty.com/faq?ref=x');
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['/faq', '/es/', '/es/limites'])('revalidates the content page %s', async (path) => {
+    const result = await worker.fetch(new Request(`https://clippy.test${path}`), bindings());
+    expect(result.headers.get('cache-control')).toBe('no-cache');
   });
 
   it('keeps missing assets as 404 instead of returning HTML', async () => {

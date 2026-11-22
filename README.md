@@ -12,6 +12,8 @@ The motion identity has two layers. A live Three.js scene behind the UI
 represents real session events, and Remotion compositions are rendered to static
 clips for the landing page. See [docs/visual-engine.md](docs/visual-engine.md)
 and [motion/](motion/README.md).
+Search: content pages in English and Spanish, the sitemap and robots.txt are
+generated from `site/` by `npm run site:build`. See [docs/seo.md](docs/seo.md).
 
 No account, no install, no persistence: two devices join a session with a short code,
 and whatever you copy on one shows up on the other over a persistent WebSocket channel.

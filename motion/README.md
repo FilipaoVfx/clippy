@@ -59,6 +59,7 @@ npm run typecheck
 npm run render            # the five web pieces → out/master + ../public/assets/motion
 npm run render -- BrandIntro
 npm run render:social     # HeroIntro + the four long chapters → out/social
+npm run render:stills     # social card (og-pastty.jpg) + the photo-guide figure → ../public/assets
 ```
 
 `render` keeps concurrency at 2 and a 120 s `delayRender` timeout for this

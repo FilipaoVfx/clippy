@@ -7,8 +7,10 @@
   function setTheme(dark) {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     themeButton.setAttribute('aria-pressed', String(dark));
-    themeButton.setAttribute('aria-label', dark ? 'Use light theme' : 'Use dark theme');
-    document.querySelector('meta[name="theme-color"]').content = dark ? '#22201e' : '#f4ece5';
+    // Content pages carry translated labels; the app falls back to English.
+    const { labelLight = 'Use light theme', labelDark = 'Use dark theme' } = themeButton.dataset;
+    themeButton.setAttribute('aria-label', dark ? labelLight : labelDark);
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#22201e' : '#f7f2ea';
   }
 
   let savedTheme;
@@ -20,7 +22,8 @@
     try { localStorage.setItem('pastty_theme', dark ? 'dark' : 'light'); } catch { /* optional preference */ }
   });
 
-  helpButton.addEventListener('click', () => {
+  // Content pages share this script but have no in-page help panel.
+  if (helpButton && help) helpButton.addEventListener('click', () => {
     help.hidden = !help.hidden;
     helpButton.setAttribute('aria-expanded', String(!help.hidden));
     if (!help.hidden) help.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
