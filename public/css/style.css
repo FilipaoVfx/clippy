@@ -1614,8 +1614,16 @@ body.visual-live .device-scene,body.visual-live[data-view] .device-scene {
   margin:auto;
   padding:44px clamp(20px,5vw,88px) 48px;
   display:grid;
-  grid-template-columns:minmax(220px,1.4fr) repeat(3,minmax(140px,1fr));
+  grid-template-columns:minmax(200px,1.3fr) repeat(4,minmax(0,1fr));
   gap:32px;
+}
+@media(max-width:1180px) {
+  .footer-inner {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .footer-brand {
+    grid-column:1 / -1;
+  }
 }
 .footer-brand .brand {
   font-size:25px;

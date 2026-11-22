@@ -47,7 +47,7 @@ What the rest showed:
 |---|---|
 | robots.txt (allows everything, declares the sitemap) | `public/robots.txt` |
 | sitemap.xml with `hreflang` alternates and an honest `lastmod` | generated |
-| 9 English and 10 Spanish content pages, and the Spanish home page `/es/` | generated from `site/pages/*.mjs` |
+| 13 English and 13 Spanish content pages (guides, FAQ, limits, about, contact, privacy, terms, cookies), and the Spanish home page `/es/` | generated from `site/pages/*.mjs` |
 | Home page `<head>` (title, canonical, hreflang, Open Graph, JSON-LD) plus an overview section and footer | generated between markers in `public/index.html` |
 | 404 page (`noindex`) | generated `public/404.html` |
 | Real 404s, `www` → apex 301, stray `?code=` links → `/?code=` | `cloudflare/worker.js`, mirrored in `server/index.js` |

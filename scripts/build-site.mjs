@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Builds the static content pages, the 404 page and sitemap.xml into public/,
+ * Builds the static content pages, the 404 page, sitemap.xml and (once an
+ * AdSense client is set) ads.txt into public/,
  * and keeps the generated <head>/footer blocks of public/index.html in sync.
  *
  *   npm run site:build          write the files; bump <lastmod> for pages whose
@@ -16,8 +17,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHROME, OG_IMAGE, ORIGIN, PUBLIC_DIR, ROOT } from '../site/config.mjs';
-import { abs, esc, footer, headTags, homeAbout, jsonLdFor, mainContent, renderPage } from '../site/layout.mjs';
+import { ADS, CHROME, OG_IMAGE, ORIGIN, PUBLIC_DIR, ROOT } from '../site/config.mjs';
+import { abs, adMode, esc, footer, headTags, homeAbout, jsonLdFor, mainContent, renderPage } from '../site/layout.mjs';
 import en from '../site/pages/en.mjs';
 import es from '../site/pages/es.mjs';
 
@@ -120,12 +121,16 @@ ${urls.join('\n')}
 `;
 }
 
+// AdSense's line, with Google's certification authority id (f08c47fec0942fa0).
+const adsTxt = (client) => `google.com, ${client.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`;
+
 /**
  * Computes every generated file. With `today`, pages whose content hash moved
  * get that date; without it the recorded dates are kept and staleness is
- * reported instead.
+ * reported instead. `ads` defaults to ADS in site/config.mjs (tests pass
+ * their own).
  */
-export function buildSite({ today } = {}) {
+export function buildSite({ today, ads = ADS } = {}) {
   const recorded = existsSync(LASTMOD_FILE) ? JSON.parse(readFileSync(LASTMOD_FILE, 'utf8')) : {};
   const registry = {};
   const stale = [];
@@ -141,21 +146,20 @@ export function buildSite({ today } = {}) {
   for (const raw of pages) {
     const page = raw.id === 'home' ? appGraph(raw) : raw;
     const file = fileFor(page.path);
+    const { serving } = adMode(page, ads);
     let output;
     let contentHash;
     if (page.external) {
       const source = readFileSync(resolve(PUBLIC_DIR, page.external), 'utf8');
       const alternates = Object.fromEntries(pages.filter((p) => p.id === page.id).map((p) => [p.lang, p.path]));
-      const head = headTags({ lang: page.lang, path: page.path, title: page.title, description: page.description, alternates, ogAlt: page.ogAlt, jsonLd: jsonLdFor(page) });
+      const head = headTags({ lang: page.lang, path: page.path, title: page.title, description: page.description, alternates, ogAlt: page.ogAlt, jsonLd: jsonLdFor(page, serving), ads });
       output = replaceBetween(source, MARK.head, head, page.external);
       output = replaceBetween(output, MARK.footer, footer(page.lang, pages), page.external);
       output = replaceBetween(output, MARK.about, homeAbout(page, pages), page.external);
       contentHash = hash(stripChrome(output));
     } else {
-      output = renderPage(page, pages);
-      contentHash = hash(mainContent(page, pages));
+      contentHash = hash(mainContent(page, pages, { serving }));
     }
-    files.set(file, output);
 
     const prev = recorded[page.path];
     let lastmod = prev?.lastmod;
@@ -165,10 +169,15 @@ export function buildSite({ today } = {}) {
     }
     registry[page.path] = { hash: contentHash, lastmod: lastmod ?? '1970-01-01' };
     entries.push({ page, lastmod: registry[page.path].lastmod });
+
+    // Rendered after the hash so a page can show its own "last updated" date.
+    if (!page.external) output = renderPage(page, pages, { ads, lastmod: registry[page.path].lastmod });
+    files.set(file, output);
   }
 
   files.set('404.html', notFoundPage());
   files.set('sitemap.xml', sitemap(entries));
+  if (ads.client) files.set('ads.txt', adsTxt(ads.client));
   return { files, registry, stale };
 }
 

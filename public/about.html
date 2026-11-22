@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f2ea">
+  <title>About Pastty: A Free Clipboard Between Your Devices</title>
+  <meta name="description" content="What Pastty is, how it works under the hood and how it stays free: a browser clipboard that relays between your devices and keeps nothing.">
+  <link rel="canonical" href="https://pastty.com/about">
+  <link rel="alternate" hreflang="en" href="https://pastty.com/about">
+  <link rel="alternate" hreflang="es" href="https://pastty.com/es/acerca-de">
+  <link rel="alternate" hreflang="x-default" href="https://pastty.com/about">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pastty">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="es_LA">
+  <meta property="og:title" content="About Pastty: A Free Clipboard Between Your Devices">
+  <meta property="og:description" content="What Pastty is, how it works under the hood and how it stays free: a browser clipboard that relays between your devices and keeps nothing.">
+  <meta property="og:url" content="https://pastty.com/about">
+  <meta property="og:image" content="https://pastty.com/assets/og-pastty.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Pastty: a pasta strand ties a loop between devices. Copy. Share. Sync.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="About Pastty: A Free Clipboard Between Your Devices">
+  <meta name="twitter:description" content="What Pastty is, how it works under the hood and how it stays free: a browser clipboard that relays between your devices and keeps nothing.">
+  <meta name="twitter:image" content="https://pastty.com/assets/og-pastty.jpg">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://pastty.com/about#webpage","url":"https://pastty.com/about","name":"About Pastty: A Free Clipboard Between Your Devices","description":"What Pastty is, how it works under the hood and how it stays free: a browser clipboard that relays between your devices and keeps nothing.","inLanguage":"en","isPartOf":{"@id":"https://pastty.com/#website"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Pastty","item":"https://pastty.com/"},{"@type":"ListItem","position":2,"name":"About","item":"https://pastty.com/about"}]}]}</script>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preload" href="/fonts/russo-one-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/fonts/manrope-400.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body class="content-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Pastty"><img src="/icon.svg" alt="" width="48" height="48"><span>Pastty<span class="brand-period">.</span></span></a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="nav-current" href="/">Open Pastty</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/faq">FAQ</a>
+    </nav>
+    <div class="header-tools">
+      <a class="lang-switch" href="/es/acerca-de" hreflang="es" lang="es">Leer en español</a>
+      <button class="theme-toggle" id="btn-theme" type="button" aria-label="Use dark theme" data-label-dark="Use dark theme" data-label-light="Use light theme" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+    </div>
+  </header>
+  <main class="page-main" id="content" tabindex="-1">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Pastty</a></li><li aria-current="page">About</li></ol></nav>
+    <header class="page-hero">
+      <div class="hero-copy">
+        <h1>A clipboard that crosses devices</h1>
+        <p class="page-lede">Pastty does one everyday job: getting text, a photo or a short video from the device in your hand to the one in front of you, without emailing it to yourself.</p>
+        <div class="page-cta"><a class="btn-primary page-btn" href="/">Open Pastty <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a><span class="cta-note">Free · No app · No account</span></div>
+      </div>
+      <figure class="page-figure" data-tone="butter"><img src="/assets/motion/pairing.webp" width="720" height="720" alt="A laptop and a phone joined by a strand, both connected." decoding="async" fetchpriority="high"></figure>
+    </header>
+    <section class="page-section"><h2>What Pastty is</h2><div class="prose"><p>Pastty is a free online clipboard that runs in the browser. One device opens a room, the others join with a short code or a QR, and whatever you send appears on the rest straight away. It works on phones, tablets and computers, on any network, with nothing to install.</p><p>It is deliberately small: text up to 10 KB, images up to 5 MB, videos up to 50 MB, and up to 5 devices in a room.</p></div></section>
+    <section class="page-section"><h2>How it is built</h2><ul class="page-cards"><li data-tone="pasta"><h3>A relay, not a store</h3><p>Pastty runs on Cloudflare Workers and Durable Objects. Each room is a short-lived relay that passes items to the devices connected at that moment and keeps none of them.</p></li><li data-tone="apricot"><h3>Rooms that expire</h3><p>A room lasts 5 minutes from the last join or reconnection, then it is gone.</p></li><li data-tone="butter"><h3>No accounts</h3><p>The code is the only thing tying your devices together. No email, no password, no profile.</p></li><li data-tone="peach"><h3>Encrypted in transit</h3><p>Everything travels over HTTPS and secure WebSockets. It is not end-to-end encrypted, and the pages say so plainly.</p></li></ul></section>
+    <section class="page-section"><h2>How it stays free</h2><div class="prose"><p>Pastty is free and shows no ads. If ads are ever added to help with hosting, they will appear only on guide pages, never on the clipboard screen where you paste and receive.</p></div></section>
+    <section class="page-section"><h2>Get in touch</h2><div class="prose"><p>Found a bug, have an idea or need to report misuse? Write to <a href="mailto:hello@pastty.com">hello@pastty.com</a>, or see the <a href="/contact">contact page</a> for what to include.</p></div></section>
+    <section class="page-section"><h2>Keep reading</h2><ul class="page-related"><li><a href="/how-it-works"><span class="related-kicker">Start here</span><span class="related-title">How it works</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li><li><a href="/privacy"><span class="related-kicker">Your data</span><span class="related-title">Privacy</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li><li><a href="/contact"><span class="related-kicker">Get in touch</span><span class="related-title">Contact</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></li></ul></section>
+    <section class="page-final" data-tone="pasta">
+      <h2>Share something in a few seconds.</h2>
+      <p>Open Pastty on two devices, pair them with the code, and send.</p>
+      <a class="btn-primary page-btn" href="/">Open Pastty <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+    </section>
+  </main>
+  <footer class="page-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="/"><img src="/icon.svg" alt="" width="40" height="40" loading="lazy"><span>Pastty<span class="brand-period">.</span></span></a>
+        <p>Less sending to yourself. More getting on with it.</p>
+      </div>
+      <nav class="footer-col" aria-label="Guides"><h2>Guides</h2><ul><li><a href="/copy-text-from-phone-to-computer">Copy text from phone to computer</a></li><li><a href="/send-photos-from-phone-to-computer">Send photos from phone to computer</a></li><li><a href="/iphone-to-windows">iPhone to Windows</a></li><li><a href="/android-to-pc">Android to PC</a></li><li><a href="/airdrop-alternative">AirDrop alternative</a></li></ul></nav>
+      <nav class="footer-col" aria-label="Pastty"><h2>Pastty</h2><ul><li><a href="/">Open Pastty</a></li><li><a href="/how-it-works">How it works</a></li><li><a href="/faq">FAQ</a></li><li><a href="/limits">Limits</a></li></ul></nav>
+      <nav class="footer-col" aria-label="About &amp; legal"><h2>About &amp; legal</h2><ul><li><a href="/about">About</a></li><li><a href="/contact">Contact</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li><li><a href="/cookies">Cookies</a></li></ul></nav>
+      <nav class="footer-col" aria-label="Language"><h2>Language</h2><ul><li><a href="/" hreflang="en" lang="en">English</a></li><li><a href="/es/" hreflang="es" lang="es">Español</a></li></ul></nav>
+    </div>
+  </footer>
+  <script defer src="/js/design.js"></script>
+</body>
+</html>

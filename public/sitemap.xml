@@ -71,6 +71,34 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/privacy"/>
   </url>
   <url>
+    <loc>https://pastty.com/cookies</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/cookies"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/cookies"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/cookies"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/terms</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/terms"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/terminos"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/terms"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/about</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/about"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/acerca-de"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/about"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/contact</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/contact"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/contacto"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/contact"/>
+  </url>
+  <url>
     <loc>https://pastty.com/es/</loc>
     <lastmod>2026-11-22</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/"/>
@@ -139,5 +167,33 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/privacidad"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/privacy"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/es/cookies</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/cookies"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/cookies"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/cookies"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/es/terminos</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/terms"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/terminos"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/terms"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/es/acerca-de</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/about"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/acerca-de"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/about"/>
+  </url>
+  <url>
+    <loc>https://pastty.com/es/contacto</loc>
+    <lastmod>2026-11-22</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pastty.com/contact"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pastty.com/es/contacto"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pastty.com/contact"/>
   </url>
 </urlset>

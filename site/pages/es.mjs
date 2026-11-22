@@ -1,8 +1,11 @@
 // Páginas en español (neutro latinoamericano). La app está en inglés, así que
 // los botones se nombran tal como aparecen en pantalla (Create room, Send…).
 // Mismas reglas que en.mjs: nada se guarda, Pastty no lee el portapapeles solo,
-// cifrado en tránsito (no de extremo a extremo).
-import { LIMITS as L } from '../config.mjs';
+// cifrado en tránsito (no de extremo a extremo). Las secciones con `ads` se
+// muestran solo en ese modo (ADS en config.mjs).
+import { CONTACT_EMAIL, LIMITS as L } from '../config.mjs';
+
+const MAIL = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
 
 const OG_ALT = 'Pastty: una hebra de pasta hace un lazo entre dispositivos. Copy. Share. Sync.';
 
@@ -443,7 +446,8 @@ export default [
     ogAlt: OG_ALT,
     h1: 'Qué hace Pastty con tus datos',
     lede: 'En corto: no hay cuentas, nada de lo que envías se guarda y las salas desaparecen solas.',
-    related: ['faq', 'limits', 'how'],
+    related: ['cookies', 'terms', 'faq'],
+    showUpdated: true,
     sections: [
       {
         type: 'cards',
@@ -463,13 +467,223 @@ export default [
       {
         type: 'prose',
         h2: 'Quién opera la infraestructura',
-        html: '<p>Pastty funciona sobre Cloudflare Workers y Durable Objects. Cloudflare procesa cada conexión para prestar el servicio y conserva registros operativos según su <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">propia política de privacidad</a>. Pastty no agrega analítica, publicidad ni rastreadores de terceros.</p>',
+        html: '<p>Pastty funciona sobre Cloudflare Workers y Durable Objects. Cloudflare procesa cada conexión para prestar el servicio y conserva registros operativos según su <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">propia política de privacidad</a>.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'Sin anuncios ni rastreadores',
+        html: '<p>Pastty no agrega analítica, publicidad ni rastreadores de terceros a ninguna página. <a href="/es/cookies">Cookies y almacenamiento</a> detalla lo poco que guarda en tu navegador.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Anuncios en las guías',
+        html: '<p>Las guías muestran anuncios de Google AdSense. Google y sus socios pueden usar cookies para mostrar anuncios según tus visitas a este y otros sitios. A quienes visitan desde el Espacio Económico Europeo, el Reino Unido y Suiza se les pide consentimiento antes, y cualquiera puede desactivar los anuncios personalizados en <a href="https://myadcenter.google.com/" rel="noopener">Mi Centro de Anuncios</a>. Los detalles están en la <a href="/es/cookies">página de cookies</a>.</p><p>La pantalla del portapapeles, donde pegas y recibes, no carga anuncios, analítica ni scripts de terceros, así que nada de lo que envías queda a su alcance.</p>',
       },
       {
         type: 'callout',
         tone: 'butter',
         h2: 'Guarda tu código',
         html: '<p>Cualquiera con un código válido puede unirse a tu sala y ver lo que envíes después. Comparte los códigos solo con gente de confianza y toca el botón de cerrar cuando termines.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Preguntas y solicitudes',
+        html: `<p>Como no hay cuentas y nada se guarda, normalmente no hay nada que consultar ni borrar. Para cualquier otra cosa sobre tus datos, escribe a ${MAIL}.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'cookies',
+    lang: 'es',
+    path: '/es/cookies',
+    nav: 'Cookies',
+    kicker: 'Tu navegador',
+    title: 'Cookies y almacenamiento del navegador en Pastty',
+    description: 'Qué guarda Pastty en tu navegador y para qué: tu tema, una sesión para volver a tu sala y los archivos de la app, además de cómo se manejan cookies y anuncios.',
+    ogAlt: OG_ALT,
+    h1: 'Cookies y almacenamiento del navegador',
+    lede: 'Pastty guarda unas pocas cosas pequeñas en tu navegador para que la app funcione. Aquí está cada una, para qué sirve y cómo quitarla.',
+    related: ['privacy', 'terms', 'contact'],
+    showUpdated: true,
+    sections: [
+      {
+        type: 'table',
+        h2: 'Qué guarda Pastty en tu dispositivo',
+        head: ['Elemento', 'Dónde', 'Para qué sirve'],
+        rows: [
+          ['<code>pastty_theme</code>', 'Almacenamiento local', 'Recuerda el tema claro u oscuro. Queda hasta que borres los datos del sitio.'],
+          ['<code>clippy_session</code>', 'Almacenamiento local', 'Permite que al recargar vuelvas a tu sala: su código, el identificador aleatorio de tu dispositivo, un token de reconexión y cuándo vence. Se borra al salir de la sala o cuando vence.'],
+          ['Archivos de la app', 'Caché del navegador', 'Las páginas, estilos y scripts de Pastty, que guarda su service worker para abrir rápido y poder instalarse. Se reemplazan en cada actualización.'],
+        ],
+      },
+      {
+        type: 'prose',
+        h2: 'Cookies',
+        html: '<p>Pastty no pone cookies propias ni usa cookies de analítica.</p><p>Cloudflare, que entrega el sitio, puede poner una cookie de seguridad estrictamente necesaria, como <code>__cf_bm</code> o <code>cf_clearance</code>, cuando necesita distinguir personas de bots. <a href="https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/" rel="noopener">Cloudflare explica sus cookies</a> (en inglés).</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'Sin publicidad',
+        html: '<p>Ninguna página de Pastty muestra anuncios ni carga cookies publicitarias.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Anuncios en las guías',
+        html: '<p>Las guías muestran anuncios de Google AdSense. Google y sus socios usan cookies e identificadores similares para mostrar y medir anuncios, limitar cuántas veces los ves y prevenir fraudes y, cuando lo permites, para basar los anuncios en tus visitas a este y otros sitios.</p><p>Quienes visitan desde el Espacio Económico Europeo, el Reino Unido y Suiza ven antes un mensaje de consentimiento de una herramienta certificada por Google, y pueden cambiar su elección después desde el enlace de configuración de privacidad que esta agrega a la página.</p><p>Puedes desactivar los anuncios personalizados en <a href="https://myadcenter.google.com/" rel="noopener">Mi Centro de Anuncios</a> y excluirte de otros proveedores en <a href="https://optout.aboutads.info/" rel="noopener">aboutads.info</a>. Google explica <a href="https://policies.google.com/technologies/partner-sites?hl=es-419" rel="noopener">cómo usa la información de los sitios que usan sus servicios</a>.</p><p>La pantalla del portapapeles no pone cookies publicitarias ni carga código de anuncios.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Cómo borrarlo',
+        html: '<p>Al salir de una sala se borra la sesión. Para quitar todo, borra los datos de este sitio en la configuración de tu navegador, normalmente en Privacidad o Configuración de sitios. Pastty sigue funcionando; solo olvida tu tema.</p>',
+      },
+    ],
+  },
+  {
+    id: 'terms',
+    lang: 'es',
+    path: '/es/terminos',
+    nav: 'Términos',
+    kicker: 'Las reglas',
+    title: 'Términos de uso: las reglas para usar Pastty',
+    description: 'Las reglas para usar Pastty: qué puedes enviar, qué no está permitido, cómo funcionan los códigos, sin garantías, límites de responsabilidad y cambios.',
+    ogAlt: OG_ALT,
+    h1: 'Términos de uso',
+    lede: 'Al usar Pastty aceptas estos términos. Son cortos y están escritos para leerse.',
+    related: ['privacy', 'cookies', 'contact'],
+    showUpdated: true,
+    sections: [
+      {
+        type: 'prose',
+        h2: 'El servicio',
+        html: `<p>Pastty es un servicio gratuito en el navegador que retransmite texto, imágenes y videos entre dispositivos que se unen a la misma sala con un código corto. Lo que envías llega a los dispositivos conectados en ese momento y no se guarda. Una sala vence ${L.codeMinutes} minutos después de la última unión o reconexión.</p><p>Pastty puede cambiar, pausarse o dejar de funcionar en cualquier momento, y sus <a href="/es/limites">límites</a> pueden cambiar con él.</p>`,
+      },
+      {
+        type: 'prose',
+        h2: 'Lo que no puedes hacer',
+        html: '<ul><li>Enviar algo que sea ilegal donde estás tú o las personas de tu sala.</li><li>Enviar contenido que sexualice, explote o ponga en riesgo a menores.</li><li>Enviar malware o cualquier cosa hecha para dañar dispositivos o datos.</li><li>Compartir contenido que no tienes derecho a compartir o que infringe derechos de otros.</li><li>Acosar, amenazar o enviar spam.</li><li>Entrar a salas a las que no te invitaron, por ejemplo adivinando códigos.</li><li>Sobrecargar o sondear el servicio, saltarte sus límites o usar herramientas automáticas para hacerlo.</li></ul>',
+      },
+      {
+        type: 'prose',
+        h2: 'Tu contenido',
+        html: '<p>Lo que envías sigue siendo tuyo y eres responsable de ello. Le das a Pastty solo el permiso necesario para pasar cada elemento a los dispositivos de tu sala. Después no se conserva nada.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Códigos de sala',
+        html: '<p>Cualquiera con un código válido puede unirse a la sala y ver lo que se envíe desde ese momento. Da los códigos solo a gente de confianza y cierra la sala cuando termines. Pastty no puede saber quién está detrás de un dispositivo.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Anuncios',
+        html: '<p>Las guías muestran anuncios servidos por Google. Los anunciantes son responsables de sus anuncios y de los sitios a los que llevan.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Sin garantías',
+        html: '<p>Pastty se ofrece tal cual y según disponibilidad, sin garantías de ningún tipo, en la medida en que la ley lo permita. No lo uses como única copia de nada, ni para algo en lo que un elemento perdido o retrasado cause daño.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Responsabilidad',
+        html: '<p>En la medida en que la ley lo permita, Pastty y quienes lo operan no responden por daños indirectos o consecuentes, ni por pérdida de datos, ganancias u oportunidades, derivados de usar el servicio o de no poder usarlo. Nada de esto elimina derechos que la ley no permite eliminar.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Bloqueo de acceso',
+        html: '<p>Se puede limitar o bloquear el acceso desde un dispositivo o una dirección de red que incumpla estos términos o ponga en riesgo el servicio o a otras personas.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Menores',
+        html: '<p>Pastty es una herramienta para público general y no está dirigida a menores de 13 años.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Cambios y preguntas',
+        html: `<p>Estos términos pueden actualizarse; la fecha de abajo indica la versión vigente. Seguir usando Pastty después de un cambio significa aceptar los nuevos términos. Las preguntas van a ${MAIL}.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'about',
+    lang: 'es',
+    path: '/es/acerca-de',
+    nav: 'Acerca de',
+    kicker: 'El proyecto',
+    title: 'Acerca de Pastty: portapapeles gratis entre dispositivos',
+    description: 'Qué es Pastty, cómo funciona por dentro y cómo se mantiene gratis: un portapapeles en el navegador que conecta tus dispositivos y no guarda nada.',
+    ogAlt: OG_ALT,
+    h1: 'Un portapapeles que cruza dispositivos',
+    lede: 'Pastty hace un trabajo de todos los días: llevar un texto, una foto o un video corto del dispositivo que tienes en la mano al que tienes enfrente, sin mandártelo por correo.',
+    figure: { src: '/assets/motion/pairing.webp', alt: 'Una laptop y un celular unidos por una hebra, los dos conectados.', tone: 'butter' },
+    related: ['how', 'privacy', 'contact'],
+    sections: [
+      {
+        type: 'prose',
+        h2: 'Qué es Pastty',
+        html: `<p>Pastty es un portapapeles online gratuito que funciona en el navegador. Un dispositivo abre una sala, los demás se unen con un código corto o un QR, y lo que envías aparece en los otros al instante. Funciona en celulares, tablets y computadoras, en cualquier red y sin instalar nada.</p><p>Es pequeño a propósito: texto de hasta ${L.text}, imágenes de hasta ${L.image}, videos de hasta ${L.video} y hasta ${L.devices} dispositivos por sala.</p>`,
+      },
+      {
+        type: 'cards',
+        h2: 'Cómo está hecho',
+        items: [
+          { title: 'Un relé, no un depósito', text: 'Pastty funciona sobre Cloudflare Workers y Durable Objects. Cada sala es un relé de corta duración que pasa lo que envías a los dispositivos conectados en ese momento y no guarda nada.' },
+          { title: 'Salas que vencen', text: `Una sala dura ${L.codeMinutes} minutos desde la última unión o reconexión y luego desaparece.` },
+          { title: 'Sin cuentas', text: 'El código es lo único que une tus dispositivos. Ni correo, ni contraseña, ni perfil.' },
+          { title: 'Cifrado en tránsito', text: 'Todo viaja por HTTPS y WebSockets seguros. No tiene cifrado de extremo a extremo, y las páginas lo dicen claramente.' },
+        ],
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'Cómo se mantiene gratis',
+        html: '<p>Pastty es gratis y no muestra anuncios. Si algún día se agregan para cubrir el hosting, aparecerán solo en las guías, nunca en la pantalla del portapapeles donde pegas y recibes.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Cómo se mantiene gratis',
+        html: '<p>Pastty es gratis. Las guías muestran anuncios de Google AdSense para ayudar a pagar el hosting. La pantalla del portapapeles, donde pegas y recibes, nunca muestra anuncios ni carga scripts de terceros. <a href="/es/cookies">Cookies y almacenamiento</a> explica qué usan los anuncios.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Escríbenos',
+        html: `<p>¿Encontraste un error, tienes una idea o quieres reportar un mal uso? Escribe a ${MAIL} o mira la <a href="/es/contacto">página de contacto</a> para saber qué incluir.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'contact',
+    lang: 'es',
+    path: '/es/contacto',
+    nav: 'Contacto',
+    kicker: 'Escríbenos',
+    title: 'Contacto de Pastty: errores, abusos y preguntas',
+    description: 'Cómo contactar a Pastty por correo: reportar un error, avisar de un mal uso de una sala, hacer una pregunta de privacidad o escribir por cualquier otro tema.',
+    ogAlt: OG_ALT,
+    h1: 'Contacto',
+    lede: `Una sola dirección para todo: ${MAIL}. Un mensaje con los datos de abajo recibe respuesta más rápido.`,
+    related: ['faq', 'privacy', 'about'],
+    sections: [
+      {
+        type: 'cards',
+        h2: 'Qué incluir',
+        items: [
+          { title: 'Un error', text: 'El dispositivo y el navegador de cada lado, qué hiciste y qué pasó en cambio. Una captura de pantalla ayuda.' },
+          { title: 'Mal uso', text: 'Qué pasó y más o menos cuándo. Los códigos vencen y nada se guarda, así que no hay contenido que revisar después: describe lo que viste.' },
+          { title: 'Privacidad', text: 'Preguntas sobre lo que maneja el servicio. La <a href="/es/privacidad">página de privacidad</a> responde casi todas.' },
+          { title: 'Otros temas', text: 'Ideas, prensa, alianzas o publicidad.' },
+        ],
+      },
+      {
+        type: 'prose',
+        h2: 'Antes de escribir',
+        html: '<p>Pastty no puede recuperar nada de lo que enviaste: todo se retransmite a los dispositivos de tu sala y nunca se guarda. Si una sala se cerró, abre una nueva.</p><p>Muchos problemas ya tienen respuesta en las <a href="/es/preguntas-frecuentes">preguntas frecuentes</a> o en la <a href="/es/limites">página de límites</a>.</p>',
       },
     ],
   },

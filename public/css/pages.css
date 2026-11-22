@@ -221,6 +221,10 @@ code {
   background:var(--surface-solid);
   box-shadow:6px 6px 0 var(--motion-shadow);
 }
+/* Keep the long text column of three-column tables near 75 characters. */
+.table-wrap:has(.page-table-wide) {
+  max-width:880px;
+}
 .page-table {
   width:100%;
   border-collapse:collapse;
@@ -280,6 +284,27 @@ code {
 .page-final .page-btn {
   margin-top:12px;
 }
+/* Ad units (only rendered when ADS.serve is on). Space is reserved so the
+   page does not jump when the ad loads; an unfilled unit is hidden. */
+.ad-slot {
+  display:grid;
+  gap:8px;
+  min-height:280px;
+  margin:0 0 56px;
+}
+.ad-slot:has(ins[data-ad-status=unfilled]) {
+  display:none;
+}
+.ad-label {
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted);
+}
+.page-updated {
+  margin:-24px 0 56px;
+  font-size:14px;
+  color:var(--muted);
+}
 .page-404 {
   max-width:760px;
   padding:48px 0 96px;
@@ -322,5 +347,35 @@ code {
   }
   .page-table th,.page-table td {
     padding:12px 14px;
+  }
+  .page-table-wide thead {
+    position:absolute;
+    width:1px;
+    height:1px;
+    overflow:hidden;
+    clip-path:inset(50%);
+  }
+  .page-table-wide tr {
+    display:grid;
+    gap:10px;
+    padding:14px 8px;
+  }
+  .page-table-wide tbody tr + tr {
+    border-top:1px solid var(--line);
+  }
+  .page-table-wide tbody tr + tr > * {
+    border-top:0;
+  }
+  .page-table-wide th,.page-table-wide td {
+    display:block;
+    padding:0 6px;
+  }
+  .page-table-wide td::before {
+    content:attr(data-label);
+    display:block;
+    margin-bottom:2px;
+    font-size:12px;
+    font-weight:800;
+    color:var(--muted);
   }
 }

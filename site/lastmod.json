@@ -1,6 +1,6 @@
 {
   "/": {
-    "hash": "66d4a3336ba72a9f",
+    "hash": "49712cbb74560950",
     "lastmod": "2026-11-22"
   },
   "/how-it-works": {
@@ -12,7 +12,7 @@
     "lastmod": "2026-11-22"
   },
   "/send-photos-from-phone-to-computer": {
-    "hash": "4a8bc57e94c737f1",
+    "hash": "144a4837a6227032",
     "lastmod": "2026-11-22"
   },
   "/iphone-to-windows": {
@@ -24,7 +24,7 @@
     "lastmod": "2026-11-22"
   },
   "/airdrop-alternative": {
-    "hash": "92d0de71d0dcb261",
+    "hash": "8ab471077d1a4167",
     "lastmod": "2026-11-22"
   },
   "/faq": {
@@ -36,7 +36,23 @@
     "lastmod": "2026-11-22"
   },
   "/privacy": {
-    "hash": "acd5ddc76ff5f45b",
+    "hash": "1718f94f8d135932",
+    "lastmod": "2026-11-22"
+  },
+  "/cookies": {
+    "hash": "be456016facf0d54",
+    "lastmod": "2026-11-22"
+  },
+  "/terms": {
+    "hash": "7151f67d0bd1d031",
+    "lastmod": "2026-11-22"
+  },
+  "/about": {
+    "hash": "eae0ab4b39c0269c",
+    "lastmod": "2026-11-22"
+  },
+  "/contact": {
+    "hash": "731cd66450f0bb9f",
     "lastmod": "2026-11-22"
   },
   "/es/": {
@@ -52,7 +68,7 @@
     "lastmod": "2026-11-22"
   },
   "/es/enviar-fotos-del-celular-a-la-computadora": {
-    "hash": "4ba6db6b7181b5a7",
+    "hash": "fdf2c257d2211150",
     "lastmod": "2026-11-22"
   },
   "/es/iphone-a-windows": {
@@ -64,7 +80,7 @@
     "lastmod": "2026-11-22"
   },
   "/es/alternativa-a-airdrop": {
-    "hash": "84f4c087b0e6f539",
+    "hash": "576e5fbfbf49eff9",
     "lastmod": "2026-11-22"
   },
   "/es/preguntas-frecuentes": {
@@ -76,7 +92,23 @@
     "lastmod": "2026-11-22"
   },
   "/es/privacidad": {
-    "hash": "70ec98b7912de327",
+    "hash": "f94d2bbbe714a60b",
+    "lastmod": "2026-11-22"
+  },
+  "/es/cookies": {
+    "hash": "ba9cda047f2fa1e0",
+    "lastmod": "2026-11-22"
+  },
+  "/es/terminos": {
+    "hash": "ba597dc39bad8c39",
+    "lastmod": "2026-11-22"
+  },
+  "/es/acerca-de": {
+    "hash": "f12800f5de3efeb1",
+    "lastmod": "2026-11-22"
+  },
+  "/es/contacto": {
+    "hash": "fcbc28f927a4f254",
     "lastmod": "2026-11-22"
   }
 }

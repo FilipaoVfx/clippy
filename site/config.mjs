@@ -10,6 +10,35 @@ export const PUBLIC_DIR = resolve(ROOT, 'public');
 export const ORIGIN = 'https://pastty.com';
 export const OG_IMAGE = { path: '/assets/og-pastty.jpg', width: 1200, height: 630 };
 
+/** Where people reach the owner (Contact, Terms, Privacy). Must deliver mail. */
+export const CONTACT_EMAIL = 'hello@pastty.com';
+
+/**
+ * Advertising (Google AdSense), off until the owner flips it. See
+ * docs/monetization.md for the whole sequence.
+ *
+ * 1. client: the publisher ID AdSense shows ("ca-pub-" + 16 digits). Adds the
+ *    site-verification meta tag and /ads.txt. No ad code loads yet.
+ * 2. serve: true only after AdSense approves the site. The pages listed in
+ *    `pages` load AdSense; Privacy, Cookies and About switch to the copy that
+ *    describes ads.
+ * 3. slot: the id of one responsive display unit (data-ad-slot). With it, those
+ *    pages get up to two marked units between sections.
+ *
+ * The app page (/) never loads ads: AdSense does not allow them on screens
+ * without publisher content, and a third-party script there could read what
+ * people paste. Legal pages, the Spanish home page and the 404 stay ad-free too.
+ */
+export const ADS = Object.freeze({
+  client: null,
+  serve: false,
+  slot: null,
+  pages: Object.freeze(['how', 'text', 'photos', 'iphone', 'android', 'airdrop', 'faq', 'limits']),
+});
+
+/** Page ids that may never carry ads, whatever ADS.pages says. */
+export const AD_FREE = Object.freeze(['home', 'privacy', 'terms', 'cookies', 'contact', 'about']);
+
 function readVars() {
   const toml = readFileSync(resolve(ROOT, 'wrangler.toml'), 'utf8');
   const section = toml.split(/^\[vars\]\s*$/m)[1]?.split(/^\[/m)[0] ?? '';
@@ -61,8 +90,11 @@ export const CHROME = {
     footerTagline: 'Less sending to yourself. More getting on with it.',
     footerGuides: 'Guides',
     footerProduct: 'Pastty',
+    footerLegal: 'About & legal',
     footerLanguage: 'Language',
     faqTitle: 'Questions',
+    adLabel: 'Advertisements',
+    updated: 'Last updated',
   },
   es: {
     locale: 'es_LA',
@@ -83,7 +115,10 @@ export const CHROME = {
     footerTagline: 'Menos mandarte cosas a ti mismo. Más seguir con lo tuyo.',
     footerGuides: 'Guías',
     footerProduct: 'Pastty',
+    footerLegal: 'Acerca y legal',
     footerLanguage: 'Idioma',
     faqTitle: 'Preguntas',
+    adLabel: 'Anuncios',
+    updated: 'Última actualización',
   },
 };

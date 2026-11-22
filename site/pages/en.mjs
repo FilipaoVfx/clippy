@@ -3,7 +3,11 @@
 // - content is relayed to devices connected at that moment and never stored;
 // - Pastty does not read the system clipboard by itself;
 // - traffic is encrypted in transit (HTTPS/WSS), not end-to-end.
-import { LIMITS as L } from '../config.mjs';
+// Sections marked `ads: 'on'` / `ads: 'off'` render only in that mode (ADS in
+// config.mjs), so Privacy, Cookies and About describe what the site really does.
+import { CONTACT_EMAIL, LIMITS as L } from '../config.mjs';
+
+const MAIL = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
 
 const OG_ALT = 'Pastty: a pasta strand ties a loop between devices. Copy. Share. Sync.';
 
@@ -24,7 +28,7 @@ export default [
       title: 'Copy and paste between your devices, right in the browser',
       text: 'Pastty is a free online clipboard. Pair your phone, tablet and computers with a short code, then send text, links, photos and videos between them in real time. Nothing to install, no account to create, and nothing kept on a server.',
       facts: [
-        ['Free', 'No plans, no ads, no account'],
+        ['Free', 'No plans, no sign-up'],
         [`Up to ${L.devices} devices`, 'In one room, on any network'],
         ['Text, images, video', `${L.text} · ${L.image} · ${L.video}`],
         ['Any browser', 'iPhone, Android, Windows, Mac, Linux'],
@@ -426,7 +430,8 @@ export default [
     ogAlt: OG_ALT,
     h1: 'What Pastty does with your data',
     lede: 'The short version: no accounts, nothing you send is stored, and rooms disappear on their own.',
-    related: ['faq', 'limits', 'how'],
+    related: ['cookies', 'terms', 'faq'],
+    showUpdated: true,
     sections: [
       {
         type: 'cards',
@@ -446,13 +451,223 @@ export default [
       {
         type: 'prose',
         h2: 'Who runs the infrastructure',
-        html: '<p>Pastty runs on Cloudflare Workers and Durable Objects. Cloudflare processes each connection to deliver the service and keeps operational logs under its <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">own privacy policy</a>. Pastty itself adds no analytics, advertising or third-party trackers.</p>',
+        html: '<p>Pastty runs on Cloudflare Workers and Durable Objects. Cloudflare processes each connection to deliver the service and keeps operational logs under its <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">own privacy policy</a>.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'No ads, no trackers',
+        html: '<p>Pastty adds no analytics, advertising or third-party trackers to any page. <a href="/cookies">Cookies and browser storage</a> lists the little it keeps in your browser.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Ads on guide pages',
+        html: '<p>Guide pages show ads from Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other sites. Visitors in the EEA, the UK and Switzerland are asked for consent first, and anyone can turn off personalised ads in <a href="https://myadcenter.google.com/" rel="noopener">My Ad Center</a>. The <a href="/cookies">cookies page</a> has the details.</p><p>The clipboard screen, where you paste and receive, loads no ads, no analytics and no third-party scripts, so nothing you send is ever in reach of them.</p>',
       },
       {
         type: 'callout',
         tone: 'butter',
         h2: 'Keep your code to yourself',
         html: '<p>Anyone with a valid code can join your room and see what you send next. Share codes only with people you trust, and press the close button when you are done.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Questions and requests',
+        html: `<p>With no accounts and nothing stored, there is usually nothing to look up or delete. For anything else about your data, write to ${MAIL}.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'cookies',
+    lang: 'en',
+    path: '/cookies',
+    nav: 'Cookies',
+    kicker: 'Your browser',
+    title: 'Cookies and Browser Storage on Pastty',
+    description: 'What Pastty saves in your browser and why: your theme, a session to rejoin your room and offline app files, plus how cookies and ads are handled.',
+    ogAlt: OG_ALT,
+    h1: 'Cookies and browser storage',
+    lede: 'Pastty keeps a few small things in your browser so the app works. Here is each one, what it is for and how to remove it.',
+    related: ['privacy', 'terms', 'contact'],
+    showUpdated: true,
+    sections: [
+      {
+        type: 'table',
+        h2: 'What Pastty saves on your device',
+        head: ['Item', 'Where', 'What it is for'],
+        rows: [
+          ['<code>pastty_theme</code>', 'Local storage', 'Remembers the light or dark theme. Stays until you clear site data.'],
+          ['<code>clippy_session</code>', 'Local storage', 'Lets a reload put you back in your room: its code, your random device id, a reconnection token and when it expires. Removed when you leave the room or it expires.'],
+          ['App files', 'Cache storage', 'Pastty’s own pages, styles and scripts, kept by its service worker so it opens fast and can be installed. Replaced on every update.'],
+        ],
+      },
+      {
+        type: 'prose',
+        h2: 'Cookies',
+        html: '<p>Pastty sets no cookies of its own and uses no analytics cookies.</p><p>Cloudflare, which delivers the site, may set a strictly necessary security cookie such as <code>__cf_bm</code> or <code>cf_clearance</code> when it needs to tell people from bots. <a href="https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/" rel="noopener">Cloudflare explains its cookies</a>.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'No advertising',
+        html: '<p>No page on Pastty shows ads or loads advertising cookies.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Ads on guide pages',
+        html: '<p>Guide pages show ads from Google AdSense. Google and its partners use cookies and similar identifiers to show and measure ads, limit how often you see them and prevent fraud, and, where you allow it, to base ads on your visits to this and other sites.</p><p>Visitors in the European Economic Area, the UK and Switzerland see a consent message from a Google-certified consent tool before any of that, and can change their choice later from the privacy settings link it adds to the page.</p><p>You can turn off personalised ads in <a href="https://myadcenter.google.com/" rel="noopener">My Ad Center</a> and opt out of other vendors at <a href="https://optout.aboutads.info/" rel="noopener">aboutads.info</a>. Google explains <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how it uses information from sites that use its services</a>.</p><p>The clipboard screen sets no advertising cookies and loads no ad code.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'How to clear it',
+        html: '<p>Leaving a room removes the session. To remove everything, clear this site’s data in your browser settings, usually under Privacy or Site settings. Pastty keeps working; it only forgets your theme.</p>',
+      },
+    ],
+  },
+  {
+    id: 'terms',
+    lang: 'en',
+    path: '/terms',
+    nav: 'Terms',
+    kicker: 'The rules',
+    title: 'Terms of Use: The Rules for Using Pastty',
+    description: 'The rules for using Pastty: what you may send, what is not allowed, how room codes work, no warranty, limits of liability and how these terms change.',
+    ogAlt: OG_ALT,
+    h1: 'Terms of use',
+    lede: 'By using Pastty you agree to these terms. They are short and meant to be read.',
+    related: ['privacy', 'cookies', 'contact'],
+    showUpdated: true,
+    sections: [
+      {
+        type: 'prose',
+        h2: 'The service',
+        html: `<p>Pastty is a free service in the browser that relays text, images and videos between devices that join the same room with a short code. Items reach the devices connected at that moment and are not stored. A room expires ${L.codeMinutes} minutes after the last join or reconnection.</p><p>Pastty may change, pause or stop at any time, and its <a href="/limits">limits</a> may change with it.</p>`,
+      },
+      {
+        type: 'prose',
+        h2: 'What you may not do',
+        html: '<ul><li>Send anything that is illegal where you or the people in your room are.</li><li>Send content that sexualises, exploits or endangers minors.</li><li>Send malware or anything meant to harm devices or data.</li><li>Share content you have no right to share, or that infringes someone else’s rights.</li><li>Harass, threaten or spam people.</li><li>Join rooms you were not invited to, for example by guessing codes.</li><li>Overload or probe the service, work around its limits, or use automated tools to do so.</li></ul>',
+      },
+      {
+        type: 'prose',
+        h2: 'Your content',
+        html: '<p>What you send stays yours, and you are responsible for it. You give Pastty only the permission it needs to pass each item to the devices in your room. Nothing is kept afterwards.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Room codes',
+        html: '<p>Anyone with a valid code can join the room and see what is sent from then on. Give codes only to people you trust and close the room when you are done. Pastty cannot tell who is behind a device.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'Ads',
+        html: '<p>Guide pages show ads served by Google. Advertisers are responsible for their ads and for the sites they lead to.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'No warranty',
+        html: '<p>Pastty is provided as is and as available, without warranties of any kind, to the extent the law allows. Do not rely on it as the only copy of anything, or where a lost or late item would cause harm.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Liability',
+        html: '<p>To the extent the law allows, Pastty and the people who run it are not liable for indirect or consequential damages, or for lost data, profits or opportunities, arising from using the service or being unable to use it. Nothing here removes rights the law does not allow to be removed.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Blocking access',
+        html: '<p>Access from a device or network address may be limited or blocked when it breaks these terms or puts the service or other people at risk.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Children',
+        html: '<p>Pastty is a general-audience tool and is not directed at children under 13.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Changes and questions',
+        html: `<p>These terms may be updated; the date below shows the current version. Using Pastty after a change means accepting the new terms. Questions go to ${MAIL}.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'about',
+    lang: 'en',
+    path: '/about',
+    nav: 'About',
+    kicker: 'The project',
+    title: 'About Pastty: A Free Clipboard Between Your Devices',
+    description: 'What Pastty is, how it works under the hood and how it stays free: a browser clipboard that relays between your devices and keeps nothing.',
+    ogAlt: OG_ALT,
+    h1: 'A clipboard that crosses devices',
+    lede: 'Pastty does one everyday job: getting text, a photo or a short video from the device in your hand to the one in front of you, without emailing it to yourself.',
+    figure: { src: '/assets/motion/pairing.webp', alt: 'A laptop and a phone joined by a strand, both connected.', tone: 'butter' },
+    related: ['how', 'privacy', 'contact'],
+    sections: [
+      {
+        type: 'prose',
+        h2: 'What Pastty is',
+        html: `<p>Pastty is a free online clipboard that runs in the browser. One device opens a room, the others join with a short code or a QR, and whatever you send appears on the rest straight away. It works on phones, tablets and computers, on any network, with nothing to install.</p><p>It is deliberately small: text up to ${L.text}, images up to ${L.image}, videos up to ${L.video}, and up to ${L.devices} devices in a room.</p>`,
+      },
+      {
+        type: 'cards',
+        h2: 'How it is built',
+        items: [
+          { title: 'A relay, not a store', text: 'Pastty runs on Cloudflare Workers and Durable Objects. Each room is a short-lived relay that passes items to the devices connected at that moment and keeps none of them.' },
+          { title: 'Rooms that expire', text: `A room lasts ${L.codeMinutes} minutes from the last join or reconnection, then it is gone.` },
+          { title: 'No accounts', text: 'The code is the only thing tying your devices together. No email, no password, no profile.' },
+          { title: 'Encrypted in transit', text: 'Everything travels over HTTPS and secure WebSockets. It is not end-to-end encrypted, and the pages say so plainly.' },
+        ],
+      },
+      {
+        type: 'prose',
+        ads: 'off',
+        h2: 'How it stays free',
+        html: '<p>Pastty is free and shows no ads. If ads are ever added to help with hosting, they will appear only on guide pages, never on the clipboard screen where you paste and receive.</p>',
+      },
+      {
+        type: 'prose',
+        ads: 'on',
+        h2: 'How it stays free',
+        html: '<p>Pastty is free. Guide pages show ads from Google AdSense to help pay for hosting. The clipboard screen, where you paste and receive, never shows ads and loads no third-party scripts. <a href="/cookies">Cookies and browser storage</a> explains what the ads use.</p>',
+      },
+      {
+        type: 'prose',
+        h2: 'Get in touch',
+        html: `<p>Found a bug, have an idea or need to report misuse? Write to ${MAIL}, or see the <a href="/contact">contact page</a> for what to include.</p>`,
+      },
+    ],
+  },
+  {
+    id: 'contact',
+    lang: 'en',
+    path: '/contact',
+    nav: 'Contact',
+    kicker: 'Get in touch',
+    title: 'Contact Pastty: Bugs, Abuse Reports and Questions',
+    description: 'How to reach Pastty by email: report a bug, flag misuse of a room, ask a privacy question, or get in touch about anything else.',
+    ogAlt: OG_ALT,
+    h1: 'Contact',
+    lede: `One address for everything: ${MAIL}. A message with the details below gets a faster answer.`,
+    related: ['faq', 'privacy', 'about'],
+    sections: [
+      {
+        type: 'cards',
+        h2: 'What to include',
+        items: [
+          { title: 'A bug', text: 'The device and browser on each side, what you did and what happened instead. A screenshot helps.' },
+          { title: 'Misuse', text: 'What happened and roughly when. Codes expire and nothing is stored, so there is no content to look up later: describe what you saw.' },
+          { title: 'Privacy', text: 'Questions about what the service handles. The <a href="/privacy">privacy page</a> answers most of them.' },
+          { title: 'Anything else', text: 'Ideas, press, partnerships or advertising.' },
+        ],
+      },
+      {
+        type: 'prose',
+        h2: 'Before you write',
+        html: '<p>Pastty cannot recover anything you sent: items are relayed to the devices in your room and never stored. If a room closed, open a new one.</p><p>Many problems already have an answer in the <a href="/faq">FAQ</a> or on the <a href="/limits">limits page</a>.</p>',
       },
     ],
   },

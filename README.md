@@ -14,6 +14,8 @@ clips for the landing page. See [docs/visual-engine.md](docs/visual-engine.md)
 and [motion/](motion/README.md).
 Search: content pages in English and Spanish, the sitemap and robots.txt are
 generated from `site/` by `npm run site:build`. See [docs/seo.md](docs/seo.md).
+Ads: off. The guide pages are ready for AdSense behind one switch, and the app
+page never carries ads. See [docs/monetization.md](docs/monetization.md).
 
 No account, no install, no persistence: two devices join a session with a short code,
 and whatever you copy on one shows up on the other over a persistent WebSocket channel.
