@@ -647,7 +647,9 @@ body::-webkit-scrollbar-thumb,.clip-feed::-webkit-scrollbar-thumb {
   height:100%;
   width:100%;
   background:var(--yellow-ink);
-  transition:width 1s linear;
+  /* Progress is a scale, not a width: no layout work on every tick. */
+  transform-origin:left center;
+  transition:transform 1s linear;
 }
 .ttl-text {
   font-size:12px;
@@ -967,9 +969,11 @@ body[data-view=connected] .device-scene,body[data-view=waiting] .device-scene {
 }
 .transfer-bar {
   height:100%;
-  width:0;
+  width:100%;
   background:var(--yellow-ink);
-  transition:width .12s linear;
+  transform:scaleX(0);
+  transform-origin:left center;
+  transition:transform .12s linear;
 }
 .toast-container {
   position:fixed;

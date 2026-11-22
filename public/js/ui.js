@@ -125,7 +125,7 @@ const UI = (() => {
    */
   function updateTTL(remainingMs, totalMs) {
     const pct = Math.max(0, (remainingMs / totalMs) * 100);
-    els.ttlProgress.style.width = `${pct}%`;
+    els.ttlProgress.style.transform = `scaleX(${pct / 100})`;
 
     const totalSec = Math.ceil(remainingMs / 1000);
     const min = Math.floor(totalSec / 60);
@@ -338,14 +338,14 @@ const UI = (() => {
     els.transferProgress.classList.add('visible');
     els.transferLabel.textContent = label;
     const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
-    els.transferBar.style.width = `${pct}%`;
+    els.transferBar.style.transform = `scaleX(${pct / 100})`;
     els.transferPct.textContent = `${pct}%`;
   }
 
   function hideTransferProgress() {
     if (!els.transferProgress) return;
     els.transferProgress.classList.remove('visible');
-    els.transferBar.style.width = '0%';
+    els.transferBar.style.transform = 'scaleX(0)';
   }
 
   /**
