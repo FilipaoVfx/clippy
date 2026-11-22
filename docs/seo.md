@@ -92,6 +92,25 @@ The pages may only claim what the code does:
 - the sitemap covers every page;
 - the generated files are committed up to date.
 
+## Hosting: who answers pastty.com
+
+`pastty.com` is served by a **Cloudflare Pages** project connected to this repo
+(see `cloudflare/DEPLOY.md`). It publishes `public/` as is, and zone routes
+send only `/ws` and `/health` to the `clippy-realtime` Worker. So in production:
+
+- Pages strips `.html` (`/faq.html` → 308 → `/faq`), adds the trailing slash
+  for `/es/`, and serves the top-level `404.html` with a 404 for unknown paths.
+  The soft 404s came from Pages' single-page-app fallback, which turns off
+  automatically once `404.html` exists.
+- `public/_headers` sends `X-Robots-Tag: noindex` on the `*.pages.dev` mirrors.
+- The routing in `cloudflare/worker.js` (404 page, `www` redirect, `?code=`
+  on other paths, `noindex` on `workers.dev`) applies wherever the Worker
+  serves the site: its `workers.dev` URL, local `wrangler dev`, or the domain
+  if it is ever moved to the Worker.
+- Pages serves `public/sw.js` without the build step, so its `BUILD_ID` stays
+  `__BUILD_ID__`. This predates the SEO work. Setting the Pages build command to
+  `npm run build` with output `dist` would give each deploy its own cache name.
+
 ## Sitemap and `lastmod`
 
 - Google ignores `changefreq` and `priority`, so the sitemap leaves them out.
@@ -120,14 +139,16 @@ To add a page:
 
 ## Owner steps (not doable from the repo)
 
-1. **Fix `www` in Cloudflare.** `www.pastty.com` still points at a parking page.
-   - In the dashboard, open DNS for pastty.com and delete the `www` record that
-     points at the parking host.
-   - Then do one of these:
-     - Add `www.pastty.com` as a custom domain of the `clippy-realtime` Worker.
-       The Worker already answers it with a 301 to `pastty.com`.
-     - Or create a proxied `AAAA www 100::` record plus a Redirect Rule:
-       `www.pastty.com/*` → `https://pastty.com/${1}`, 301.
+1. **Fix `www` in Cloudflare.** `www.pastty.com` still points at a parking page
+   (a 525 over HTTPS).
+   - In DNS for pastty.com, delete that `www` record.
+   - Add a proxied `AAAA www 100::` record.
+   - In **Rules › Redirect Rules**, create a single redirect: when the hostname
+     equals `www.pastty.com`, send a 301 to the dynamic target
+     `concat("https://pastty.com", http.request.uri.path)` and preserve the
+     query string.
+   - Do not add `www` as a Pages custom domain: that would serve a duplicate
+     copy instead of redirecting.
    - Verify with `npm run seo:check -- https://pastty.com`.
 2. **Google Search Console.**
    - Add a domain property for `pastty.com` (DNS TXT verification in

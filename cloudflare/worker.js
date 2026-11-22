@@ -40,9 +40,15 @@ function cacheControlFor(pathname) {
   return "public, max-age=0, must-revalidate";
 }
 
-function withHeaders(response, pathname) {
+// pastty.com is the only canonical host; the workers.dev URL is a mirror.
+function isMirror(url) {
+  return url.hostname.endsWith(".workers.dev");
+}
+
+function withHeaders(response, pathname, url) {
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", cacheControlFor(pathname));
+  if (url && isMirror(url)) headers.set("X-Robots-Tag", "noindex");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -55,7 +61,7 @@ async function serveAsset(request, env) {
   const assetResponse = await env.ASSETS.fetch(request);
   // The 404 page itself is not a page: visiting it directly is still a 404.
   if (assetResponse.status !== 404 && url.pathname !== NOT_FOUND_PAGE) {
-    return withHeaders(assetResponse, url.pathname);
+    return withHeaders(assetResponse, url.pathname, url);
   }
 
   const readable = request.method === "GET" || request.method === "HEAD";

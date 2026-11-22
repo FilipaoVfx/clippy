@@ -67,8 +67,11 @@ const missingBody = await missing.text();
 check('unknown page → 404 (no soft 404)', missing.status === 404, String(missing.status));
 check('404 page is HTML with noindex', /<html/.test(missingBody) && /noindex/.test(missingBody));
 
+// Only the Worker does this (pastty.com's pages are served by Cloudflare Pages,
+// which cannot match query strings). Informational: QR links always use "/?code=".
 const legacy = await get('/join?code=ABC-12D');
-check('stray paths with a code open the app', legacy.status === 302 && /\/\?code=ABC-12D$/.test(legacy.headers.get('location') || ''), `${legacy.status} ${legacy.headers.get('location')}`);
+const redirected = legacy.status === 302 && /\/\?code=ABC-12D$/.test(legacy.headers.get('location') || '');
+console.log(`${redirected ? '✓' : '·'} stray paths with a code open the app (Worker only) — ${legacy.status}`);
 
 if (new URL(base).hostname === 'pastty.com') {
   const www = await fetch('https://www.pastty.com/faq', { redirect: 'manual' }).catch((e) => ({ status: e.message }));

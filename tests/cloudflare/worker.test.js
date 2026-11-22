@@ -109,6 +109,13 @@ describe('Cloudflare Worker entrypoint', () => {
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
   });
 
+  it('keeps the workers.dev mirror out of search results', async () => {
+    const mirror = await worker.fetch(new Request('https://clippy-realtime.example.workers.dev/faq'), bindings());
+    expect(mirror.headers.get('x-robots-tag')).toBe('noindex');
+    const canonical = await worker.fetch(new Request('https://pastty.com/faq'), bindings());
+    expect(canonical.headers.get('x-robots-tag')).toBeNull();
+  });
+
   it.each(['/faq', '/es/', '/es/limites'])('revalidates the content page %s', async (path) => {
     const result = await worker.fetch(new Request(`https://clippy.test${path}`), bindings());
     expect(result.headers.get('cache-control')).toBe('no-cache');

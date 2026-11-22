@@ -1,0 +1,7 @@
+# Cloudflare Pages serves pastty.com straight from public/. Its *.pages.dev
+# hostnames are mirrors of the same site: keep them out of search results.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
